@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MCP — anyclaude-sdk</title>
+  <meta name="description" content="Model Context Protocol in anyclaude-sdk: external HTTP/SSE MCP servers, in-process SDK servers (createSdkMcpServer/tool), tool namespacing, and a CORS proxy for the browser." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.1.0 · MIT</div>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <div class="grp">Reference</div>
+      <a href="providers.html">LLM providers</a>
+      <a href="sandboxes.html">Sandboxes &amp; FS</a>
+      <a href="tools.html">Tools</a>
+      <a href="teams.html">Teams &amp; sub-agents</a>
+      <a href="mcp.html" class="active">MCP</a>
+      <a href="advanced.html">Sessions, hooks &amp; more</a>
+      <a href="api.html">API reference</a>
+      <div class="grp">Ship</div>
+      <a href="deploy.html">Deploy</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="top">
+      <h1>MCP — Model Context Protocol</h1>
+      <p class="tag">Wire external tools into the agent. anyclaude-sdk loads tools from <b>remote MCP servers</b> (HTTP/SSE) and <b>in-process SDK servers</b> (plain JS, no subprocess), wrapping each as a native tool. Pass them via <code>query({ mcpServers })</code>.</p>
+    </section>
+
+    <section id="external">
+      <h2><i data-lucide="server"></i> External MCP servers (HTTP / SSE)</h2>
+      <p>Configure remote servers by name. Each entry sets a <code>type</code> (<code>'http'</code> or <code>'sse'</code>), a <code>url</code>, and optional <code>headers</code> (e.g. auth). Their tools are discovered on connect and exposed to the model namespaced as <code>mcp__&lt;server&gt;__&lt;tool&gt;</code>.</p>
+      <div class="code"><pre><code class="language-ts">import { query } from 'anyclaude-sdk'
+
+await query({
+  prompt: 'Search the docs and summarize the auth flow.',
+  workspace, llm,
+  mcpServers: {
+    docs: { type: 'http', url: 'https://mcp.example.com/mcp', headers: { Authorization: 'Bearer …' } },
+    events: { type: 'sse', url: 'https://mcp.example.com/sse' },
+  },
+})
+// Model sees tools like: mcp__docs__search, mcp__events__subscribe</code></pre></div>
+      <p>Loading <b>never throws</b>: a server that fails to connect simply contributes no tools and a <code>failed</code> status. Per-server connection status is surfaced on the <code>system</code> <code>init</code> message (<code>mcp_servers</code>), so you can show it in your UI.</p>
+    </section>
+
+    <section id="sdk">
+      <h2><i data-lucide="plug-zap"></i> In-process SDK servers</h2>
+      <p>Define MCP tools in plain JavaScript that run in the <b>same process</b> as the agent — no network, no transport. Build them with <code>tool()</code> and group them with <code>createSdkMcpServer()</code>, then pass under <code>mcpServers</code>. They appear to the model as <code>mcp__&lt;name&gt;__&lt;tool&gt;</code> too.</p>
+      <div class="code"><pre><code class="language-ts">import { query, createSdkMcpServer, tool } from 'anyclaude-sdk'
+
+const math = createSdkMcpServer({
+  name: 'math',
+  tools: [
+    tool(
+      'add',
+      'Add two numbers',
+      { type: 'object', properties: { a: { type: 'number' }, b: { type: 'number' } }, required: ['a', 'b'] },
+      async ({ a, b }) =&gt; ({ content: [{ type: 'text', text: String((a as number) + (b as number)) }] }),
+    ),
+  ],
+})
+
+await query({ prompt, workspace, llm, mcpServers: { math } })
+// → mcp__math__add</code></pre></div>
+      <p>An SDK tool's <code>handler</code> returns MCP content blocks (<code>text</code>, <code>image</code>, <code>resource</code>, …); the SDK maps them into the agent's result blocks (images come through natively).</p>
+      <div class="card" style="border-left:3px solid var(--accent)"><p><b>SDK MCP server vs. <code>defineTool</code>?</b> Use <code>defineTool</code> + <code>extraTools</code> for a plain native tool. Use an SDK MCP server when you want MCP semantics/namespacing or to mirror an existing MCP toolset — see <a href="tools.html">Tools</a>.</p></div>
+    </section>
+
+    <section id="proxy">
+      <h2><i data-lucide="shield"></i> CORS proxy (for the browser)</h2>
+      <p>Browsers block direct cross-origin fetches to most MCP servers (no permissive CORS). Route remote MCP requests through a proxy you control with <code>mcpProxy</code>. Not needed in Node/Bun or for in-process SDK servers.</p>
+      <div class="code"><pre><code class="language-ts">await query({
+  prompt, workspace, llm,
+  mcpServers: { docs: { type: 'http', url: 'https://mcp.example.com/mcp' } },
+  // Any of these forms:
+  mcpProxy: 'https://my-proxy.example/?u={url}',   // {url} → URL-encoded target
+  // mcpProxy: 'https://my-proxy.example/{rawUrl}', // {rawUrl} → raw target
+  // mcpProxy: 'https://my-proxy.example/',         // bare prefix (raw appended)
+  // mcpProxy: (target) =&gt; `https://my-proxy.example/?u=${encodeURIComponent(target)}`,
+})</code></pre></div>
+      <p>The proxy must forward the request (method, body, and headers — including <code>Mcp-Session-Id</code> and <code>Content-Type</code>) to the target, then echo permissive CORS headers and the <code>Mcp-Session-Id</code> response header back.</p>
+    </section>
+  </main>
+</div>
+</body>
+</html>

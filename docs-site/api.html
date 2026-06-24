@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API reference — anyclaude-sdk</title>
+  <meta name="description" content="query() options and SDKMessage types for anyclaude-sdk." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.1.0 · MIT</div>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <div class="grp">Reference</div>
+      <a href="providers.html">LLM providers</a>
+      <a href="sandboxes.html">Sandboxes &amp; FS</a>
+      <a href="tools.html">Tools</a>
+      <a href="teams.html">Teams &amp; sub-agents</a>
+      <a href="mcp.html">MCP</a>
+      <a href="advanced.html">Sessions, hooks &amp; more</a>
+      <a href="api.html" class="active">API reference</a>
+      <div class="grp">Ship</div>
+      <a href="deploy.html">Deploy</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="top">
+      <h1>API reference</h1>
+      <p class="tag">The whole SDK is one entry point: <code>query(options)</code>. It returns an async generator of <code>SDKMessage</code>s. Everything else — tools, sandboxes, providers, sessions, teams — is configured through the options object.</p>
+    </section>
+
+    <section id="query">
+      <h2><i data-lucide="terminal"></i> query(options)</h2>
+      <p>Mirrors <code>@anthropic-ai/claude-agent-sdk</code>'s <code>query()</code>. Returns a <code>Query</code> — an <code>AsyncGenerator&lt;SDKMessage&gt;</code> with an <code>interrupt()</code> method.</p>
+      <div class="code"><pre><code class="language-ts">import { query, createOpenAIClient, LocalSandbox } from 'anyclaude-sdk'
+
+const q = query({
+  prompt: 'List the files and summarize the project.',
+  workspace: new LocalSandbox({ cwd: process.cwd() }),
+  llm: createOpenAIClient({ baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o', apiKey: process.env.OPENAI_API_KEY }),
+  model: 'gpt-4o',
+})
+
+for await (const msg of q) {
+  if (msg.type === 'assistant') console.log(msg.message.content)
+  if (msg.type === 'result') console.log('done', msg.usage)
+}
+// q.interrupt()  // abort the in-flight run from elsewhere</code></pre></div>
+      <p>The <code>prompt</code> may be a plain string (single turn) or an <code>AsyncIterable&lt;SDKUserMessage&gt;</code> for multi-turn / interactive sessions (see <code>PromptStream</code> below).</p>
+    </section>
+
+    <section id="options">
+      <h2><i data-lucide="settings-2"></i> QueryOptions</h2>
+      <p>Only <code>prompt</code>, <code>workspace</code>, and <code>llm</code> are required. Everything else is optional.</p>
+
+      <h3>Core</h3>
+      <table class="opts">
+        <tr><th>Option</th><th>Type</th><th>Notes</th></tr>
+        <tr><td><code>prompt</code></td><td>string | AsyncIterable&lt;SDKUserMessage&gt;</td><td><b>Required.</b> One turn, or a stream of turns.</td></tr>
+        <tr><td><code>workspace</code></td><td>Workspace</td><td><b>Required.</b> FileSystem + CommandExecutor. See <a href="sandboxes.html">Sandboxes</a>.</td></tr>
+        <tr><td><code>llm</code></td><td>LLMClient</td><td><b>Required.</b> See <a href="providers.html">LLM providers</a>.</td></tr>
+        <tr><td><code>model</code></td><td>string</td><td>Model id sent to the client (overrides the client default per call).</td></tr>
+        <tr><td><code>maxTurns</code></td><td>number</td><td>Max tool-loop iterations. Default 50.</td></tr>
+        <tr><td><code>cwd</code></td><td>string</td><td>Working directory the agent operates in.</td></tr>
+        <tr><td><code>abortController</code></td><td>AbortController</td><td>Stops the LLM stream + pending tools. Or use <code>q.interrupt()</code>.</td></tr>
+        <tr><td><code>includePartialMessages</code></td><td>boolean</td><td>Emit <code>stream_event</code> text deltas as they arrive (live streaming UI).</td></tr>
+      </table>
+
+      <h3>System prompt</h3>
+      <table class="opts">
+        <tr><td><code>systemPrompt</code></td><td>string</td><td>Replace the default system prompt entirely.</td></tr>
+        <tr><td><code>appendSystemPrompt</code></td><td>string</td><td>Append to the default (e.g. describe the real OS/shell).</td></tr>
+      </table>
+
+      <h3>Tools</h3>
+      <table class="opts">
+        <tr><td><code>tools</code></td><td>Tool[]</td><td>REPLACES the builtin set. Default: all builtins.</td></tr>
+        <tr><td><code>extraTools</code></td><td>Tool[]</td><td>ADDS to the builtins. Use <code>defineTool</code>. See <a href="tools.html">Tools</a>.</td></tr>
+        <tr><td><code>allowedTools</code></td><td>string[]</td><td>Whitelist by name.</td></tr>
+        <tr><td><code>disallowedTools</code></td><td>string[]</td><td>Denylist (applied after allow).</td></tr>
+        <tr><td><code>limits</code></td><td>Partial&lt;FileReadLimits&gt;</td><td>Tune read_file caps (size/tokens/image/pdf).</td></tr>
+      </table>
+
+      <h3>Permissions &amp; hooks</h3>
+      <table class="opts">
+        <tr><td><code>canUseTool</code></td><td>CanUseTool</td><td>Gate invoked before each tool call.</td></tr>
+        <tr><td><code>permissionMode</code></td><td>PermissionMode</td><td>bypassPermissions · default · acceptEdits · plan · dontAsk.</td></tr>
+        <tr><td><code>permissionRules</code></td><td>{ allow?, deny?, ask? }</td><td>Rule strings → builds a gate.</td></tr>
+        <tr><td><code>onPermissionAsk</code></td><td>(tool, input) =&gt; Promise&lt;boolean&gt;</td><td>Prompt callback for "ask" decisions.</td></tr>
+        <tr><td><code>hooks</code></td><td>Partial&lt;Record&lt;HookEvent, HookCallback[]&gt;&gt;</td><td>Lifecycle hooks. See <a href="advanced.html">Hooks</a>.</td></tr>
+        <tr><td><code>settings</code></td><td>boolean | Settings</td><td>Load <code>.claude/settings.json</code> cascade, or pass a Settings object.</td></tr>
+      </table>
+
+      <h3>Sub-agents, teams &amp; background</h3>
+      <table class="opts">
+        <tr><td><code>agents</code></td><td>Record&lt;string, AgentDefinition&gt;</td><td>Custom sub-agents for the <code>task</code> tool.</td></tr>
+        <tr><td><code>maxSubagentDepth</code></td><td>number</td><td>Max nesting. Default 2.</td></tr>
+        <tr><td><code>background</code></td><td>boolean</td><td>Enable background tasks (<code>task_list/output/stop</code>).</td></tr>
+        <tr><td><code>backgroundManager</code></td><td>BackgroundTaskManager</td><td>Inject a shared manager so tasks persist across turns.</td></tr>
+        <tr><td><code>team</code></td><td>boolean</td><td>Teammate coordination (mailbox + board + coordinator prompt).</td></tr>
+        <tr><td><code>mailbox</code> / <code>board</code></td><td>Mailbox / TaskBoard</td><td>Inject shared instances so they persist across turns.</td></tr>
+        <tr><td><code>agentName</code></td><td>string</td><td>This agent's name for messaging. Default 'coordinator'.</td></tr>
+        <tr><td><code>messageQueue</code></td><td>MessageQueue</td><td>Interject user messages mid-run (one per turn boundary).</td></tr>
+      </table>
+
+      <h3>MCP</h3>
+      <table class="opts">
+        <tr><td><code>mcpServers</code></td><td>McpServers</td><td>External (HTTP/SSE) or in-process SDK servers. See <a href="mcp.html">MCP</a>.</td></tr>
+        <tr><td><code>mcpProxy</code></td><td>McpProxy</td><td>Route remote MCP through a proxy (browser CORS).</td></tr>
+        <tr><td><code>commands</code></td><td>SlashCommand[]</td><td>Custom slash commands (merged with builtins).</td></tr>
+      </table>
+
+      <h3>Sessions, memory &amp; compaction</h3>
+      <table class="opts">
+        <tr><td><code>sessionStore</code></td><td>SessionStore</td><td>Persist the transcript (keyed by <code>sessionId</code>).</td></tr>
+        <tr><td><code>sessionId</code></td><td>string</td><td>Session key.</td></tr>
+        <tr><td><code>resume</code></td><td>boolean</td><td>Load the stored transcript before the first turn.</td></tr>
+        <tr><td><code>memory</code></td><td>MemoryStore</td><td>Persistent memory loaded into the system prompt.</td></tr>
+        <tr><td><code>skills</code></td><td>boolean | Skill[]</td><td>Load <code>.claude/skills/*.md</code>, or pass a Skill[].</td></tr>
+        <tr><td><code>autoCompact</code></td><td>boolean</td><td>Summarize the transcript near the context limit.</td></tr>
+        <tr><td><code>contextLimit</code> / <code>compactThreshold</code></td><td>number</td><td>Context window (default model window or 200k) and trigger fraction (default 0.8).</td></tr>
+      </table>
+    </section>
+
+    <section id="messages">
+      <h2><i data-lucide="message-square"></i> SDKMessage</h2>
+      <p>The generator yields a discriminated union on <code>type</code>:</p>
+      <div class="code"><pre><code class="language-ts">// 1. system / init — first message: model, tools, cwd, mcp status, permissionMode
+{ type: 'system', subtype: 'init', tools: string[], model: string, cwd: string, … }
+
+// 2. assistant — a model turn: text + tool_use blocks
+{ type: 'assistant', message: { role: 'assistant', content: ContentBlock[] } }
+
+// 3. stream_event — partial deltas (only when includePartialMessages: true)
+{ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text } } }
+
+// 4. user — synthetic tool results (isSynthetic: true) or queued user turns
+{ type: 'user', message: { role: 'user', content: ContentBlock[] }, isSynthetic?: boolean }
+
+// 5. system / local_command_output — output of a slash command
+{ type: 'system', subtype: 'local_command_output', content: string }
+
+// 6. system / compact_boundary — emitted when the transcript was compacted
+{ type: 'system', subtype: 'compact_boundary', compact_metadata: { trigger, pre_tokens } }
+
+// 7. result — terminal: success or error, with usage + cost
+{ type: 'result', subtype: 'success' | 'error_max_turns' | 'error_during_execution',
+  result?: string, usage: { input_tokens, output_tokens, … }, total_cost_usd: number,
+  duration_ms: number, num_turns: number }</code></pre></div>
+    </section>
+
+    <section id="promptstream">
+      <h2><i data-lucide="repeat"></i> Multi-turn: PromptStream</h2>
+      <p>For interactive sessions, feed turns with a push-based queue instead of a single string:</p>
+      <div class="code"><pre><code class="language-ts">import { query, PromptStream } from 'anyclaude-sdk'
+
+const prompts = new PromptStream()
+const q = query({ prompt: prompts, workspace, llm, model })
+
+;(async () => { for await (const m of q) render(m) })()
+
+prompts.push('first message')
+prompts.push('follow-up')   // each push is a new user turn
+// prompts.end()             // close the conversation</code></pre></div>
+      <p>To interject a message <i>while a turn is still running</i> (delivered at the next turn boundary), use <code>messageQueue</code> instead — see <a href="advanced.html">Sessions, hooks &amp; more</a>.</p>
+    </section>
+
+    <section id="exports">
+      <h2><i data-lucide="package"></i> Key exports</h2>
+      <div class="cards">
+        <div class="card"><h4>Entry</h4><p><code>query</code>, <code>PromptStream</code></p></div>
+        <div class="card"><h4>LLM</h4><p><code>createOpenAIClient</code>, <code>createAnthropicClient</code>, <code>createResponsesClient</code></p></div>
+        <div class="card"><h4>Sandboxes</h4><p><code>LocalSandbox</code>, <code>E2BSandbox</code>, <code>VercelSandbox</code>, <code>DaytonaSandbox</code>, <code>CloudflareSandbox</code>, <code>WebContainerWorkspace</code>, <code>composeWorkspace</code></p></div>
+        <div class="card"><h4>Filesystems</h4><p><code>MemoryFileSystem</code>, <code>DexieFileSystem</code>, <code>OpfsFileSystem</code>, <code>seedLinuxTree</code></p></div>
+        <div class="card"><h4>Tools</h4><p><code>defineTool</code>, <code>ALL_CLAUDE_CODE_TOOLS</code></p></div>
+        <div class="card"><h4>Teams &amp; bg</h4><p><code>BackgroundTaskManager</code>, <code>Mailbox</code>, <code>TaskBoard</code>, <code>MessageQueue</code></p></div>
+        <div class="card"><h4>MCP</h4><p><code>createSdkMcpServer</code>, <code>tool</code></p></div>
+        <div class="card"><h4>Commands</h4><p><code>BUILTIN_COMMANDS</code>, <code>loadSkillsFromFs</code></p></div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

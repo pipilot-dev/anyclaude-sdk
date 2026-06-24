@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teams &amp; sub-agents — anyclaude-sdk</title>
+  <meta name="description" content="Sub-agents, background tasks, and the teammate/coordinator system in anyclaude-sdk: the task tool, BackgroundTaskManager, Mailbox, TaskBoard, and dispatch_tasks." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.1.0 · MIT</div>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <div class="grp">Reference</div>
+      <a href="providers.html">LLM providers</a>
+      <a href="sandboxes.html">Sandboxes &amp; FS</a>
+      <a href="tools.html">Tools</a>
+      <a href="teams.html" class="active">Teams &amp; sub-agents</a>
+      <a href="mcp.html">MCP</a>
+      <a href="advanced.html">Sessions, hooks &amp; more</a>
+      <a href="api.html">API reference</a>
+      <div class="grp">Ship</div>
+      <a href="deploy.html">Deploy</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="top">
+      <h1>Teams &amp; sub-agents</h1>
+      <p class="tag">Three ways to fan work out: spawn isolated <b>sub-agents</b> with the <code>task</code> tool, run them in the <b>background</b> and poll them, or stand up a full <b>teammate/coordinator</b> system with a shared mailbox and task board.</p>
+    </section>
+
+    <section id="subagents">
+      <h2><i data-lucide="git-fork"></i> Sub-agents — the <code>task</code> tool</h2>
+      <p>When sub-agents are enabled, the agent gains a <code>task</code> tool. Each call runs a fresh, isolated child agent to completion and returns <b>only its final text</b> — the child's intermediate tool calls never enter the parent conversation. Use it to parallelize or isolate self-contained work (research, broad searches, multi-file changes).</p>
+
+      <h3>Enabling sub-agents</h3>
+      <p>Pass an <code>agents</code> map (even an empty one enables the general-purpose sub-agent):</p>
+      <div class="code"><pre><code class="language-ts">import { query } from 'anyclaude-sdk'
+
+for await (const m of query({
+  prompt: 'Audit every route file for missing auth checks.',
+  workspace, llm,
+  agents: {},                  // enables the `task` tool (general-purpose sub-agent)
+  maxSubagentDepth: 2,         // how deep sub-agents may nest (default 2)
+})) { /* … */ }</code></pre></div>
+
+      <h3>The <code>task</code> tool parameters</h3>
+      <div class="cards">
+        <div class="card"><h4>description</h4><p>Short (3–5 word) label for the task.</p></div>
+        <div class="card"><h4>prompt</h4><p>The detailed instructions for the sub-agent.</p></div>
+        <div class="card"><h4>subagent_type</h4><p>Optional — name of a configured agent type (see below). Defaults to general-purpose.</p></div>
+        <div class="card"><h4>run_in_background</h4><p>Run detached and return a task id immediately. Poll with <code>task_output</code> / <code>task_list</code>.</p></div>
+      </div>
+
+      <h3>Custom agent types (<code>AgentDefinition</code>)</h3>
+      <p>Give named agents their own system prompt, a restricted tool set, and even a different model. The model selects one via <code>subagent_type</code>.</p>
+      <div class="code"><pre><code class="language-ts">await query({
+  prompt: 'Research the auth flow, then write a summary.',
+  workspace, llm,
+  agents: {
+    researcher: {
+      prompt: 'You are a read-only research agent. Find facts; do not edit files.',
+      tools: ['read_file', 'glob', 'grep', 'web_search'], // subset of tool names
+      model: 'claude-sonnet-4-6',                          // optional per-agent model
+    },
+  },
+})
+// The model can now call: task({ subagent_type: 'researcher', description: '…', prompt: '…' })</code></pre></div>
+    </section>
+
+    <section id="background">
+      <h2><i data-lucide="loader"></i> Background tasks</h2>
+      <p>Background tasks run detached from the main loop so a long sub-agent (or shell command) doesn't block the conversation. Enable them with <code>background: true</code>, or <b>inject a shared <code>BackgroundTaskManager</code></b> so tasks survive across turns (start one in one message, read it in a later one).</p>
+      <div class="code"><pre><code class="language-ts">import { query, BackgroundTaskManager } from 'anyclaude-sdk'
+
+const background = new BackgroundTaskManager() // shared across turns
+await query({ prompt, workspace, llm, agents: {}, backgroundManager: background })
+// (or simply: query({ ..., background: true }) for a per-call manager)</code></pre></div>
+      <p>This adds three tools the agent uses to manage detached work:</p>
+      <div class="cards">
+        <div class="card"><h4><code>task</code> + run_in_background</h4><p>Starts a sub-agent in the background, returns <code>bg_N</code> immediately.</p></div>
+        <div class="card"><h4><code>task_list</code></h4><p>List background tasks and their status (<code>running</code>/<code>completed</code>/<code>failed</code>/<code>stopped</code>).</p></div>
+        <div class="card"><h4><code>task_output</code></h4><p>Read a task's accumulated output by id (streams progress as it runs).</p></div>
+        <div class="card"><h4><code>task_stop</code></h4><p>Abort a running background task (cancels its sub-agent).</p></div>
+      </div>
+      <div class="card" style="border-left:3px solid var(--accent)"><p>You can also drive the manager from your own code: <code>background.list()</code>, <code>background.output(id)</code>, <code>await background.wait(id)</code>, <code>background.stop(id)</code> — handy for rendering a live task bar in your UI.</p></div>
+    </section>
+
+    <section id="teams">
+      <h2><i data-lucide="users"></i> Teammates &amp; coordinator</h2>
+      <p>Set <code>team: true</code> to turn the agent into a <b>coordinator</b>: it gets a coordinator system-prompt addendum plus tools to message teammates and manage a shared task board. Inject a <code>Mailbox</code> and <code>TaskBoard</code> to share them across turns (and with sub-agents).</p>
+      <div class="code"><pre><code class="language-ts">import { query, Mailbox, TaskBoard } from 'anyclaude-sdk'
+
+const mailbox = new Mailbox()
+const board = new TaskBoard()
+
+await query({
+  prompt: 'Build the dirsize CLI: scaffold, implement, test. Use the board + workers.',
+  workspace, llm,
+  agents: {},        // sub-agents (workers)
+  team: true,        // coordinator tools + prompt
+  mailbox, board,    // shared, persistent across turns
+})</code></pre></div>
+
+      <h3>Coordinator tools</h3>
+      <div class="cards">
+        <div class="card"><h4><code>send_message</code></h4><p><code>{ to, text }</code> — message a teammate via the shared mailbox.</p></div>
+        <div class="card"><h4><code>task_create</code></h4><p><code>{ subject, description?, owner?, blocked_by? }</code> — add a board task; gate it on prerequisite task ids.</p></div>
+        <div class="card"><h4><code>task_update</code></h4><p><code>{ id, status?, owner?, subject?, description? }</code> — status is <code>pending|in_progress|completed|failed</code>.</p></div>
+        <div class="card"><h4><code>task_get</code></h4><p><code>{ id }</code> — full detail for one task (incl. blocked/blocks).</p></div>
+        <div class="card"><h4><code>board_list</code></h4><p><code>{ status?, owner? }</code> — list board tasks, optionally filtered.</p></div>
+        <div class="card"><h4><code>dispatch_tasks</code></h4><p>Hand ready (unblocked) board tasks to workers in parallel and collect results.</p></div>
+      </div>
+
+      <h3>Driving a team in code</h3>
+      <p>For full control, <code>runTeamLoop</code> coordinates an idle-loop where workers claim ready tasks until the board drains:</p>
+      <div class="code"><pre><code class="language-ts">import { runTeamLoop } from 'anyclaude-sdk'
+// runTeamLoop({ board, mailbox, spawnWorker, ... }) → drives workers to claim
+// unblocked tasks, run them, and report back until the board is complete.</code></pre></div>
+      <div class="card" style="border-left:3px solid var(--accent)"><p><b>Shared by design.</b> The same <code>Mailbox</code> and <code>TaskBoard</code> are passed to spawned sub-agents, so the coordinator and workers operate on one set of tasks and messages.</p></div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

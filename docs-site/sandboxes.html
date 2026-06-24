@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sandboxes &amp; filesystems — anyclaude-sdk</title>
+  <meta name="description" content="Pluggable sandboxes (WebContainer, LocalSandbox, E2B, Vercel, Daytona, Cloudflare) and persistent filesystems (Memory, Dexie/IndexedDB, OPFS) for anyclaude-sdk. A sandbox is just a FileSystem + a CommandExecutor." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.1.0 · MIT</div>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <div class="grp">Reference</div>
+      <a href="providers.html">LLM providers</a>
+      <a href="sandboxes.html" class="active">Sandboxes &amp; FS</a>
+      <a href="tools.html">Tools</a>
+      <a href="teams.html">Teams &amp; sub-agents</a>
+      <a href="mcp.html">MCP</a>
+      <a href="advanced.html">Sessions, hooks &amp; more</a>
+      <a href="api.html">API reference</a>
+      <div class="grp">Ship</div>
+      <a href="deploy.html">Deploy</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="top">
+      <span class="pill"><i data-lucide="box"></i> Sandboxes &amp; filesystems</span>
+      <h1>A sandbox is just<br />files&nbsp;+&nbsp;a shell.</h1>
+      <p class="tag">The agent loop consumes one thing — a <b>Workspace</b>: a <code>FileSystem</code> paired with a <code>CommandExecutor</code>. Swap in a browser WebContainer, the real local OS, or a cloud microVM (E2B, Vercel, Daytona, Cloudflare) without touching agent code. Pair any filesystem with any executor via <code>composeWorkspace</code>.</p>
+    </section>
+
+    <section id="model">
+      <h2>The Workspace model</h2>
+      <p>Everything in this page implements two small interfaces. <code>query()</code> only ever sees the combination.</p>
+      <div class="code"><pre><code class="language-ts">interface FileSystem {
+  readFile(path: string): Promise&lt;string | null&gt;
+  readBinary(path: string): Promise&lt;Uint8Array | null&gt;
+  writeFile(path: string, contents: string): Promise&lt;void&gt;
+  writeBinary(path: string, data: Uint8Array): Promise&lt;void&gt;
+  deleteFile(path: string): Promise&lt;void&gt;
+  readdir(path: string): Promise&lt;Array&lt;{ name: string; isDir: boolean }&gt; | null&gt;
+  mkdir(path: string): Promise&lt;void&gt;
+}
+
+interface CommandExecutor {
+  exec(command: string, timeoutMs?: number, env?: Record&lt;string, string&gt;):
+    Promise&lt;{ output: string; exitCode: number }&gt;
+}
+
+// A Sandbox is both, optionally rooted at a cwd:
+interface Sandbox extends FileSystem, CommandExecutor {
+  readonly cwd?: string
+  init?(): Promise&lt;void&gt;     // some providers need explicit setup…
+  dispose?(): Promise&lt;void&gt;   // …and teardown
+}</code></pre></div>
+
+      <h3>composeWorkspace — mix any FS with any executor</h3>
+      <p>Pair a persistent browser filesystem with a remote shell, or build a <b>file-only agent</b> with <code>NoopCommandExecutor</code> (which refuses to run commands). When a <code>cwd</code> is given it is authoritative: relative paths resolve against it before hitting the underlying FS; absolute paths pass through.</p>
+      <div class="code"><pre><code class="language-ts">import { composeWorkspace, MemoryFileSystem, NoopCommandExecutor } from 'anyclaude-sdk'
+
+// A file-only workspace (no shell) rooted at /home/user
+const workspace = composeWorkspace(
+  new MemoryFileSystem(),
+  new NoopCommandExecutor(),
+  '/home/user'
+)
+
+query({ prompt, workspace, llm })</code></pre></div>
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <p style="margin:0"><i data-lucide="lightbulb"></i> <b>Mental model.</b> Tools like <code>read_file</code>/<code>write_file</code>/<code>bash</code> call straight through to the Workspace. Choosing a sandbox is choosing <em>where those calls land</em> — a browser tab, this machine, or a cloud VM.</p>
+      </div>
+    </section>
+
+    <section id="sandboxes">
+      <h2>Sandbox providers</h2>
+      <p>Adapters wrap each provider's client <b>structurally</b> — there's no hard dependency on their SDKs, so you install only the one you use. All implement the same <code>Sandbox</code> interface.</p>
+
+      <h3><i data-lucide="globe"></i> WebContainerWorkspace — browser</h3>
+      <p>Runs a real Node-like environment (the <code>jsh</code> shell) entirely in the browser tab via StackBlitz WebContainers. Peer dep: <code>@webcontainer/api</code>.</p>
+      <div class="code"><pre><code class="language-ts">import { WebContainer } from '@webcontainer/api'
+import { WebContainerWorkspace, query } from 'anyclaude-sdk'
+
+const wc = await WebContainer.boot()
+const workspace = new WebContainerWorkspace(wc)   // optional 2nd arg: cwd
+
+query({ prompt, workspace, llm })</code></pre></div>
+
+      <h3><i data-lucide="hard-drive"></i> LocalSandbox — real OS (Node / Bun)</h3>
+      <p>Drives the host machine's actual filesystem and shell, like Claude Code. Auto-detects the platform (Windows / macOS / Linux); <code>cwd</code> defaults to <code>process.cwd()</code>. On Windows it uses <code>cmd.exe</code>; elsewhere <code>$SHELL</code> / <code>/bin/sh</code> (override via <code>shell</code> / <code>shellArgs</code>). No peer dep.</p>
+      <div class="code"><pre><code class="language-ts">import { LocalSandbox, query } from 'anyclaude-sdk'
+
+const workspace = new LocalSandbox({ cwd: '/path/to/project' })
+console.log(workspace.platform)   // 'windows' | 'mac' | 'linux'
+
+// The agent's working directory is taken from the sandbox automatically.
+for await (const msg of query({ prompt: 'add a CLI flag and run the tests', workspace, llm })) { /* … */ }</code></pre></div>
+
+      <h3><i data-lucide="cloud"></i> Cloud microVMs — E2B · Vercel · Daytona · Cloudflare</h3>
+      <p>Each wraps the provider's sandbox client. Construct the provider's sandbox, then hand it to the adapter. Default <code>cwd</code> shown per provider.</p>
+      <div class="tabgroup">
+        <div class="tabs">
+          <button class="tab active">E2B</button>
+          <button class="tab">Vercel</button>
+          <button class="tab">Daytona</button>
+          <button class="tab">Cloudflare</button>
+        </div>
+        <div class="pane active">
+          <p>Peer dep: <code>e2b</code> · default cwd <code>/home/user</code>.</p>
+          <div class="code"><pre><code class="language-ts">import { Sandbox } from 'e2b'
+import { E2BSandbox, query } from 'anyclaude-sdk'
+
+const sbx = await Sandbox.create()
+const workspace = new E2BSandbox(sbx)            // or new E2BSandbox(sbx, '/home/user')
+
+query({ prompt, workspace, llm })</code></pre></div>
+        </div>
+        <div class="pane">
+          <p>Peer dep: <code>@vercel/sandbox</code> · default cwd <code>/vercel/sandbox</code>.</p>
+          <div class="code"><pre><code class="language-ts">import { Sandbox } from '@vercel/sandbox'
+import { VercelSandbox, query } from 'anyclaude-sdk'
+
+const sbx = await Sandbox.create()
+const workspace = new VercelSandbox(sbx)
+
+query({ prompt, workspace, llm })</code></pre></div>
+        </div>
+        <div class="pane">
+          <p>Peer dep: <code>@daytonaio/sdk</code> · default cwd <code>/home/daytona</code>.</p>
+          <div class="code"><pre><code class="language-ts">import { Daytona } from '@daytonaio/sdk'
+import { DaytonaSandbox, query } from 'anyclaude-sdk'
+
+const workspaceVm = await new Daytona().create()
+const workspace = new DaytonaSandbox(workspaceVm)
+
+query({ prompt, workspace, llm })</code></pre></div>
+        </div>
+        <div class="pane">
+          <p>Peer dep: <code>@cloudflare/sandbox</code> · default cwd <code>/workspace</code>. Pairs well with Workers / Durable Objects.</p>
+          <div class="code"><pre><code class="language-ts">import { getSandbox } from '@cloudflare/sandbox'
+import { CloudflareSandbox, query } from 'anyclaude-sdk'
+
+const sbx = getSandbox(env.Sandbox, 'session-id')
+const workspace = new CloudflareSandbox(sbx)
+
+query({ prompt, workspace, llm })</code></pre></div>
+        </div>
+      </div>
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <p style="margin:0"><i data-lucide="info"></i> Each adapter also has a <code>create*Sandbox(client, cwd?)</code> factory (e.g. <code>createE2BSandbox</code>) if you prefer functions over <code>new</code>. The <code>*ClientLike</code> types are structural — anything matching the shape works, so you're never blocked on an exact SDK version.</p>
+      </div>
+    </section>
+
+    <section id="filesystems">
+      <h2>Filesystems</h2>
+      <p>When you don't need a full sandbox shell (e.g. a browser chat agent that only reads/writes files), pick a filesystem and pair it with <code>NoopCommandExecutor</code> — or with a remote executor — via <code>composeWorkspace</code>.</p>
+      <div class="cards">
+        <div class="card"><h4><i data-lucide="cpu"></i> MemoryFileSystem</h4><p>In-memory, ephemeral. Great for tests, demos, and stateless serverless runs. Zero deps.</p></div>
+        <div class="card"><h4><i data-lucide="database"></i> DexieFileSystem</h4><p>IndexedDB-backed, <b>durable</b> across reloads, queryable, with metadata. The recommended persistent browser FS. Peer dep: <code>dexie</code>.</p></div>
+        <div class="card"><h4><i data-lucide="folder-tree"></i> OpfsFileSystem</h4><p>Origin Private File System — native hierarchical handles, best for large binary files. No extra dep (browser API).</p></div>
+        <div class="card"><h4><i data-lucide="sprout"></i> seedLinuxTree(fs)</h4><p>Lay down a standard Linux FHS skeleton (<code>/home</code>, <code>/tmp</code>, …) so an agent feels at home. Exports <code>LINUX_DIRS</code>, <code>DEFAULT_HOME</code>.</p></div>
+      </div>
+      <div class="code"><pre><code class="language-ts">import { DexieFileSystem, seedLinuxTree } from 'anyclaude-sdk'
+import { composeWorkspace, NoopCommandExecutor } from 'anyclaude-sdk'
+
+const fs = new DexieFileSystem()        // persists in IndexedDB
+await seedLinuxTree(fs)                  // scaffold /home, /tmp, …
+const workspace = composeWorkspace(fs, new NoopCommandExecutor(), '/home/user')
+
+query({ prompt: 'create notes.md and list the home dir', workspace, llm })</code></pre></div>
+    </section>
+
+    <section id="recipes">
+      <h2>Recipes — which to use</h2>
+      <div class="tabgroup">
+        <div class="tabs">
+          <button class="tab active">Browser</button>
+          <button class="tab">Node / Bun</button>
+          <button class="tab">Cloud</button>
+        </div>
+        <div class="pane active">
+          <p>Full shell in-tab → <b>WebContainer</b>. Files-only, persistent → <b>Dexie + Noop</b>.</p>
+          <div class="code"><pre><code class="language-ts">import { WebContainer } from '@webcontainer/api'
+import { WebContainerWorkspace } from 'anyclaude-sdk'
+const workspace = new WebContainerWorkspace(await WebContainer.boot())
+query({ prompt, workspace, llm })</code></pre></div>
+        </div>
+        <div class="pane">
+          <p>Real machine, real shell → <b>LocalSandbox</b>.</p>
+          <div class="code"><pre><code class="language-ts">import { LocalSandbox } from 'anyclaude-sdk'
+const workspace = new LocalSandbox({ cwd: process.cwd() })
+query({ prompt, workspace, llm })</code></pre></div>
+        </div>
+        <div class="pane">
+          <p>Isolated, disposable, long-lived → a <b>cloud microVM</b> (E2B shown). Also lets the agent loop run <em>inside</em> the VM for unbounded runtimes — see <a href="deploy.html">Deploy</a>.</p>
+          <div class="code"><pre><code class="language-ts">import { Sandbox } from 'e2b'
+import { E2BSandbox } from 'anyclaude-sdk'
+const workspace = new E2BSandbox(await Sandbox.create())
+query({ prompt, workspace, llm })</code></pre></div>
+        </div>
+      </div>
+      <p class="tag" style="margin-top:18px">Next: <a href="tools.html">Tools</a> the agent uses against the workspace, or the <a href="api.html">API reference</a>.</p>
+    </section>
+  </main>
+</div>
+</body>
+</html>

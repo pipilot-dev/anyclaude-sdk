@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tools — anyclaude-sdk</title>
+  <meta name="description" content="Built-in tools, multimodal file reading, custom tools with defineTool, and tool selection in anyclaude-sdk." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.1.0 · MIT</div>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <div class="grp">Reference</div>
+      <a href="providers.html">LLM providers</a>
+      <a href="sandboxes.html">Sandboxes &amp; FS</a>
+      <a href="tools.html" class="active">Tools</a>
+      <a href="teams.html">Teams &amp; sub-agents</a>
+      <a href="mcp.html">MCP</a>
+      <a href="advanced.html">Sessions, hooks &amp; more</a>
+      <a href="api.html">API reference</a>
+      <div class="grp">Ship</div>
+      <a href="deploy.html">Deploy</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="top" class="hero">
+      <span class="pill"><i data-lucide="wrench"></i> Tools</span>
+      <h1>Tools</h1>
+      <p class="tag">The agent acts through <b>tools</b>. anyclaude-sdk ships the full Claude&nbsp;Code tool suite — files, shell, search, web, todos — and lets you add your own with <code>defineTool</code> or restrict the set with allow/deny lists.</p>
+    </section>
+
+    <section id="builtin">
+      <h2>Built-in tools</h2>
+      <p>All built-ins are exported as <code>ALL_CLAUDE_CODE_TOOLS</code> and are the default when you don't pass <code>tools</code>. Each is a <code>Tool</code> = an OpenAI-shape function definition + a <code>run(input, ctx)</code> implementation.</p>
+      <table style="width:100%;border-collapse:collapse;font-size:14px;margin:14px 0">
+        <thead><tr style="text-align:left;border-bottom:1px solid var(--border)">
+          <th style="padding:8px 10px">Tool</th><th style="padding:8px 10px">What it does</th><th style="padding:8px 10px">Key params</th>
+        </tr></thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>bash</code></td><td style="padding:8px 10px">Run a shell command in the workspace; returns combined stdout+stderr</td><td style="padding:8px 10px"><code>command</code>, <code>timeout_ms?</code>, <code>description?</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>read_file</code></td><td style="padding:8px 10px">Read a file — text, images, PDF, notebooks, binary (see below)</td><td style="padding:8px 10px"><code>path</code>, <code>offset?</code>, <code>limit?</code>, <code>pages?</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>write_file</code></td><td style="padding:8px 10px">Write a file, creating parent directories as needed</td><td style="padding:8px 10px"><code>path</code>, <code>content</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>edit_file</code></td><td style="padding:8px 10px">Exact string replacement in an existing file</td><td style="padding:8px 10px"><code>path</code>, <code>old_string</code>, <code>new_string</code>, <code>replace_all?</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>multi_edit</code></td><td style="padding:8px 10px">Several exact replacements applied atomically to one file</td><td style="padding:8px 10px"><code>path</code>, <code>edits[]</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>delete_file</code></td><td style="padding:8px 10px">Delete a file or directory recursively</td><td style="padding:8px 10px"><code>path</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>list_files</code></td><td style="padding:8px 10px">List directory contents (defaults to workspace root)</td><td style="padding:8px 10px"><code>path?</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>glob</code></td><td style="padding:8px 10px">Find files matching a glob pattern (e.g. <code>src/**/*.ts</code>)</td><td style="padding:8px 10px"><code>pattern</code>, <code>path?</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>grep</code></td><td style="padding:8px 10px">Search file contents with a regular expression</td><td style="padding:8px 10px"><code>pattern</code>, <code>path?</code>, <code>glob?</code>, <code>output_mode?</code>, <code>-i</code>, <code>-n</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>notebook_edit</code></td><td style="padding:8px 10px">Edit cells in a Jupyter <code>.ipynb</code> notebook</td><td style="padding:8px 10px"><code>path</code>, <code>cell_id?</code>, <code>new_source</code>, <code>cell_type?</code>, <code>edit_mode?</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>todo_write</code></td><td style="padding:8px 10px">Create / replace the session's structured todo list</td><td style="padding:8px 10px"><code>todos[]</code> (<code>content</code>, <code>status</code>, <code>activeForm?</code>)</td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>web_fetch</code></td><td style="padding:8px 10px">Fetch a URL and return clean, readable text</td><td style="padding:8px 10px"><code>url</code>, <code>prompt?</code>, <code>headers?</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>web_search</code></td><td style="padding:8px 10px">Search the web and return the top results</td><td style="padding:8px 10px"><code>query</code>, <code>num_results?</code></td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:8px 10px"><code>tool_search</code></td><td style="padding:8px 10px">Discover available tools by keyword (handy with large tool sets)</td><td style="padding:8px 10px"><code>query</code>, <code>limit?</code></td></tr>
+          <tr><td style="padding:8px 10px"><code>config</code></td><td style="padding:8px 10px">Read or write session configuration key/value pairs</td><td style="padding:8px 10px"><code>action</code>, <code>key?</code>, <code>value?</code></td></tr>
+        </tbody>
+      </table>
+      <p>The agent loop runs each tool behind the permission gate; image/PDF bytes returned by a tool are forwarded to the model as a follow-up multimodal user turn automatically.</p>
+    </section>
+
+    <section id="file-reading">
+      <h2>Multimodal file reading</h2>
+      <p><code>read_file</code> is content-aware — it returns the right block type for what it finds:</p>
+      <div class="cards">
+        <div class="card"><div class="ic"><i data-lucide="file-text"></i></div><h4>Text</h4><p>UTF-8 text with <code>cat -n</code> line numbers; slice with <code>offset</code> / <code>limit</code>.</p></div>
+        <div class="card"><div class="ic"><i data-lucide="image"></i></div><h4>Images</h4><p>PNG/JPG/… decoded to a base64 image block (downsampled to fit <code>maxImageBytes</code>) and sent to the model.</p></div>
+        <div class="card"><div class="ic"><i data-lucide="file-type-2"></i></div><h4>PDF</h4><p>Rendered per page; request a range with <code>pages</code> (e.g. <code>"1-5"</code>), capped at <code>maxPdfPages</code>.</p></div>
+        <div class="card"><div class="ic"><i data-lucide="notebook-pen"></i></div><h4>Notebooks</h4><p><code>.ipynb</code> parsed into cells + outputs; edit with <code>notebook_edit</code>.</p></div>
+        <div class="card"><div class="ic"><i data-lucide="binary"></i></div><h4>Binary</h4><p>Detected and reported (size/type) instead of dumping bytes into the context.</p></div>
+      </div>
+      <h3>Tuning limits</h3>
+      <p>Pass <code>limits</code> to <code>query()</code> to adjust the read caps (<code>FileReadLimits</code>):</p>
+      <div class="code"><pre><code class="language-ts">import { query } from 'anyclaude-sdk'
+
+for await (const msg of query({
+  prompt: 'Summarize report.pdf',
+  workspace, llm, model,
+  limits: {
+    maxSizeBytes: 256 * 1024,   // reject text reads over 256 KB (default)
+    maxTokens: 25_000,          // reject text whose estimate exceeds this
+    maxImageBytes: 3.75 * 1024 * 1024, // max image bytes after downsampling
+    maxPdfPages: 20,            // max PDF pages returned per read
+  },
+})) { /* … */ }</code></pre></div>
+    </section>
+
+    <section id="custom">
+      <h2>Custom tools</h2>
+      <p>Define your own tool with <code>defineTool</code> — a name, description, JSON-Schema parameters, and a <code>run</code> method. <code>run</code> receives the parsed input and a <code>ToolContext</code> (<code>fs</code>, <code>exec</code>, <code>cwd</code>, <code>signal</code>, …) and returns a <code>ToolResult</code> (<code>{ content, isError? }</code>). It can do anything async — hit an API, query a DB, call the sandbox.</p>
+      <div class="code"><pre><code class="language-ts">import { defineTool, query } from 'anyclaude-sdk'
+
+const weather = defineTool({
+  name: 'get_weather',
+  description: 'Current weather for a city.',
+  parameters: {
+    properties: { city: { type: 'string', description: 'City name' } },
+    required: ['city'],
+  },
+  run: async ({ city }, ctx) => {
+    const r = await fetch(`https://api.example.com/wx?q=${encodeURIComponent(String(city))}`, { signal: ctx.signal })
+    return { content: await r.text() }
+  },
+})
+
+// ctx also exposes the workspace — a tool that reads a file directly:
+const countLines = defineTool({
+  name: 'count_lines',
+  description: 'Count lines in a workspace file.',
+  parameters: { properties: { path: { type: 'string' } }, required: ['path'] },
+  run: async ({ path }, ctx) => {
+    const text = await ctx.fs.readFile(String(path))
+    return { content: `${text.split('\n').length} lines` }
+  },
+})</code></pre></div>
+
+      <h3><code>extraTools</code> vs <code>tools</code></h3>
+      <p><code>extraTools</code> <b>adds</b> your tools to the built-ins; <code>tools</code> <b>replaces</b> the whole set.</p>
+      <div class="tabgroup">
+        <div class="tabs"><button class="tab active">extraTools (additive)</button><button class="tab">tools (replace)</button></div>
+        <div class="pane active"><div class="code"><pre><code class="language-ts">query({
+  prompt: 'What\'s the weather in Paris?',
+  workspace, llm, model,
+  extraTools: [weather, countLines], // builtins (read/write/bash/grep…) STILL available
+})</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">import { readFile, writeFile } from 'anyclaude-sdk'
+
+query({
+  prompt: '…',
+  workspace, llm, model,
+  tools: [readFile, writeFile, weather], // ONLY these three exist
+})</code></pre></div></div>
+      </div>
+      <div class="card" style="border-left:3px solid var(--accent);margin-top:14px">
+        <p style="margin:0"><i data-lucide="info"></i> A <code>Tool</code> is just <code>{ def, run, maxResultChars? }</code>. <code>defineTool</code> builds the <code>def</code> for you; you can also hand-write the OpenAI function schema if you prefer.</p>
+      </div>
+    </section>
+
+    <section id="selection">
+      <h2>Selecting &amp; disabling tools</h2>
+      <p>Narrow what the agent can use with <code>allowedTools</code> (whitelist — only these) and <code>disallowedTools</code> (denylist — remove these). They apply to built-ins, <code>extraTools</code>, and MCP tools alike. Set them per call or in <code>.claude/settings.json</code>.</p>
+      <div class="tabgroup">
+        <div class="tabs"><button class="tab active">Per query()</button><button class="tab">.claude/settings.json</button></div>
+        <div class="pane active"><div class="code"><pre><code class="language-ts">// Whitelist: read-only research agent
+query({ prompt, workspace, llm, model, allowedTools: ['read_file', 'glob', 'grep', 'web_search'] })
+
+// Denylist: everything except shell + deletion
+query({ prompt, workspace, llm, model, disallowedTools: ['bash', 'delete_file'] })</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-json">{
+  "allowedTools": ["read_file", "write_file", "edit_file", "glob", "grep"],
+  "disallowedTools": ["bash"]
+}</code></pre></div></div>
+      </div>
+      <p>Resolution order: start from <code>tools</code> (or built-ins) + <code>extraTools</code> → apply <code>allowedTools</code> → apply <code>disallowedTools</code>.</p>
+    </section>
+
+    <section id="large-outputs">
+      <h2>Large tool outputs</h2>
+      <p>Tools can set <code>maxResultChars</code>. When a result exceeds it, the agent loop spills the full output to a file in the workspace and replaces it in-context with a short preview + the path — so a giant grep or log dump never blows the context window. Self-bounded tools (like <code>read_file</code>) opt out with <code>maxResultChars: Infinity</code>.</p>
+      <div class="code"><pre><code class="language-ts">const bigReport = defineTool({
+  name: 'gen_report',
+  description: 'Generate a large report.',
+  parameters: { properties: {}, required: [] },
+  run: async () =&gt; ({ content: hugeString }),
+  maxResultChars: 4000, // beyond this → spilled to a file + preview
+})</code></pre></div>
+    </section>
+
+    <footer>
+      <p><a href="https://www.npmjs.com/package/anyclaude-sdk">npm</a> · <a href="https://github.com/pipilot-dev/anyclaude-sdk">GitHub</a> · <a href="api.html">API reference</a></p>
+      <p class="muted">Built by Hans Ade · MIT</p>
+    </footer>
+  </main>
+</div>
+</body>
+</html>

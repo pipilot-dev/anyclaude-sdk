@@ -39,20 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
     })
   })
 
-  // Active-section highlighting in the sidebar
-  const links = [...document.querySelectorAll('.nav a')]
-  const map = new Map(links.map((a) => [a.getAttribute('href').slice(1), a]))
-  const obs = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) {
-          links.forEach((a) => a.classList.remove('active'))
-          const a = map.get(e.target.id)
-          if (a) a.classList.add('active')
-        }
-      })
-    },
-    { rootMargin: '-10% 0px -75% 0px', threshold: 0 }
-  )
-  document.querySelectorAll('section[id]').forEach((s) => obs.observe(s))
+  // Mark the current page active in the sidebar (multi-page docs portal)
+  const here = location.pathname.split('/').pop() || 'index.html'
+  document.querySelectorAll('.nav a').forEach((a) => {
+    const href = a.getAttribute('href') || ''
+    if (href === here || ((here === '' || here === 'index.html') && href === 'index.html')) a.classList.add('active')
+  })
 })

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM providers — anyclaude-sdk</title>
+  <meta name="description" content="Connect anyclaude-sdk to any OpenAI- or Anthropic-compatible LLM: the LLMClient interface, the three transport clients, per-provider recipes, inline tool-call parsing, and key rotation." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.1.0 · MIT</div>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <div class="grp">Reference</div>
+      <a href="providers.html" class="active">LLM providers</a>
+      <a href="sandboxes.html">Sandboxes &amp; FS</a>
+      <a href="tools.html">Tools</a>
+      <a href="teams.html">Teams &amp; sub-agents</a>
+      <a href="mcp.html">MCP</a>
+      <a href="advanced.html">Sessions, hooks &amp; more</a>
+      <a href="api.html">API reference</a>
+      <div class="grp">Ship</div>
+      <a href="deploy.html">Deploy</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="top">
+      <h1><i data-lucide="plug"></i> LLM providers</h1>
+      <p class="tag">anyclaude-sdk talks to <b>any OpenAI- or Anthropic-compatible endpoint</b> through a single small interface. Pick a transport client, point it at a base URL, pass a model — that's the whole integration. The agent loop, tools, and streaming work identically across providers.</p>
+    </section>
+
+    <section id="interface">
+      <h2>The <code>LLMClient</code> interface</h2>
+      <p>Everything the agent needs from a model is one method. You pass an <code>LLMClient</code> to <code>query({ llm })</code>; the SDK calls <code>streamChat()</code> once per turn, streams text through <code>onToken</code>, and reads back any tool calls.</p>
+      <div class="code"><pre><code class="language-ts">interface LLMClient {
+  streamChat(
+    messages: ChatMsg[],
+    opts: {
+      model?: string                       // per-call model override
+      tools?: ToolDef[]                    // OpenAI-shape function definitions
+      signal?: AbortSignal                 // cancellation (Esc / abort)
+      onToken: (delta: string) =&gt; void     // streamed text deltas
+      onTool?: (calls: ToolCall[]) =&gt; void  // tool calls as they assemble
+    }
+  ): Promise&lt;StreamResult&gt;
+}
+
+type StreamResult = {
+  text: string            // full assistant text for the turn
+  toolCalls: ToolCall[]   // tool calls the model requested
+  model: string
+  usage?: Usage           // input/output tokens, cache reads
+  stopReason?: StopReason
+}</code></pre></div>
+      <p>Because it's just an interface, you can also <b>bring your own client</b> — wrap any SDK or HTTP API that can stream text and emit tool calls, and the agent loop won't know the difference.</p>
+    </section>
+
+    <section id="clients">
+      <h2>Three built-in transport clients</h2>
+      <p>All three are exported from the package root and implement <code>LLMClient</code>. They differ only in the wire format they speak:</p>
+      <div class="cards">
+        <div class="card"><h4><code>createOpenAIClient</code></h4><p>POSTs to <code>{baseUrl}/chat/completions</code>. The workhorse — OpenAI, xAI, Groq, Together, OpenRouter, Ollama, Kilo, local servers.</p></div>
+        <div class="card"><h4><code>createAnthropicClient</code></h4><p>POSTs to <code>{baseUrl}/messages</code> with the Anthropic Messages shape (system extracted, <code>anthropic-version</code> header).</p></div>
+        <div class="card"><h4><code>createResponsesClient</code></h4><p>POSTs to <code>{baseUrl}/responses</code> (OpenAI Responses API). Sends full history each turn; <code>store</code> optional.</p></div>
+      </div>
+
+      <h3>Options</h3>
+      <p><code>createOpenAIClient(options)</code> — the most featureful:</p>
+      <div class="code"><pre><code class="language-ts">createOpenAIClient({
+  apiKey?: string | (() =&gt; string | undefined), // static key OR a getter (key rotation)
+  baseUrl?: string,            // default https://api.openai.com/v1
+  model?: string,              // default model id (override per-call via opts.model)
+  headers?: Record&lt;string,string&gt;,  // extra headers (Groq/OpenRouter/Together/xAI)
+  temperature?: number,
+  maxTokens?: number,          // → max_tokens
+  reasoningEffort?: string,    // → reasoning_effort ('none' | 'low' | 'high' …) for reasoning models
+  parallelToolCalls?: boolean, // → parallel_tool_calls (only sent when tools are present)
+})</code></pre></div>
+      <p><code>createAnthropicClient</code> takes <code>apiKey</code>, <code>baseUrl</code>, <code>model</code>, <code>headers</code>, <code>temperature</code>, <code>maxTokens</code> (default 4096), and <code>anthropicVersion</code> (default <code>'2023-06-01'</code>). <code>createResponsesClient</code> takes <code>apiKey</code>, <code>baseUrl</code>, <code>model</code>, <code>headers</code>, <code>temperature</code>, <code>maxTokens</code> (→ <code>max_output_tokens</code>), and <code>store</code> (default false — full history is sent each turn).</p>
+      <div class="card" style="border-left:3px solid var(--accent)"><p><i data-lucide="info"></i> All clients stream Server-Sent Events and request <code>stream_options.include_usage</code>, so token usage and cost are reported even mid-stream. Keyless endpoints just omit <code>apiKey</code> — no <code>authorization</code> header is sent.</p></div>
+    </section>
+
+    <section id="recipes">
+      <h2>Provider recipes</h2>
+      <p>Every recipe is just a client + a base URL + a model. Use it as the <code>llm</code> in <code>query()</code>.</p>
+      <div class="tabgroup">
+        <div class="tabs">
+          <button class="tab active">OpenAI</button>
+          <button class="tab">Anthropic</button>
+          <button class="tab">xAI grok-4.3</button>
+          <button class="tab">Ollama</button>
+          <button class="tab">Kilo</button>
+          <button class="tab">Groq</button>
+          <button class="tab">Together</button>
+          <button class="tab">OpenRouter</button>
+          <button class="tab">Local</button>
+        </div>
+        <div class="pane active"><div class="code"><pre><code class="language-ts">import { createOpenAIClient } from 'anyclaude-sdk'
+
+const llm = createOpenAIClient({
+  baseUrl: 'https://api.openai.com/v1',
+  model: 'gpt-4o',
+  apiKey: process.env.OPENAI_API_KEY,
+})</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">import { createAnthropicClient } from 'anyclaude-sdk'
+
+const llm = createAnthropicClient({
+  baseUrl: 'https://api.anthropic.com/v1',
+  model: 'claude-sonnet-4-6',
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  maxTokens: 8192,
+})</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">import { createOpenAIClient } from 'anyclaude-sdk'
+
+// grok-4.x: 0 reasoning tokens (cheaper/faster) + parallel tools +
+// a stable conv id for ~6× cheaper prefix-cached tokens.
+const llm = createOpenAIClient({
+  baseUrl: 'https://api.x.ai/v1',
+  model: 'grok-4.3',
+  apiKey: process.env.XAI_API_KEY,
+  temperature: 0.3,
+  reasoningEffort: 'none',
+  parallelToolCalls: true,
+  headers: { 'x-grok-conv-id': 'my-stable-run-id' },
+})</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">import { createOpenAIClient } from 'anyclaude-sdk'
+
+const llm = createOpenAIClient({
+  baseUrl: 'https://ollama.com/v1',   // or http://localhost:11434/v1
+  model: 'qwen3-coder-next',
+  apiKey: process.env.OLLAMA_API_KEY, // omit for local Ollama
+})</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">import { createOpenAIClient } from 'anyclaude-sdk'
+
+const llm = createOpenAIClient({
+  baseUrl: 'https://api.kilo.ai/api/gateway',
+  model: 'kilo-auto/free',
+  apiKey: process.env.KILO_API_KEY,
+})</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">import { createOpenAIClient } from 'anyclaude-sdk'
+
+const llm = createOpenAIClient({
+  baseUrl: 'https://api.groq.com/openai/v1',
+  model: 'llama-3.3-70b-versatile',
+  apiKey: process.env.GROQ_API_KEY,
+})</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">import { createOpenAIClient } from 'anyclaude-sdk'
+
+const llm = createOpenAIClient({
+  baseUrl: 'https://api.together.xyz/v1',
+  model: 'meta-llama/Llama-3.3-70B-Instruct-Turbo',
+  apiKey: process.env.TOGETHER_API_KEY,
+})</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">import { createOpenAIClient } from 'anyclaude-sdk'
+
+const llm = createOpenAIClient({
+  baseUrl: 'https://openrouter.ai/api/v1',
+  model: 'anthropic/claude-sonnet-4',
+  apiKey: process.env.OPENROUTER_API_KEY,
+  headers: { 'HTTP-Referer': 'https://your.app', 'X-Title': 'Your App' },
+})</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">import { createOpenAIClient } from 'anyclaude-sdk'
+
+// llama.cpp server, LM Studio, vLLM — any OpenAI-compatible local server.
+const llm = createOpenAIClient({
+  baseUrl: 'http://localhost:8080/v1',
+  model: 'local-model',
+  // no apiKey needed
+})</code></pre></div></div>
+      </div>
+    </section>
+
+    <section id="inline-tools">
+      <h2>Inline tool-call parsing</h2>
+      <p>Many relays and open models don't emit native function-calling blocks — they write tool calls as <b>inline XML text</b> in the assistant message:</p>
+      <div class="code"><pre><code class="language-xml">&lt;tool_call&gt;
+&lt;function=write_file&gt;
+&lt;parameter=path&gt;index.html&lt;/parameter&gt;
+&lt;parameter=content&gt;&lt;!DOCTYPE html&gt; ...&lt;/parameter&gt;
+&lt;/function&gt;
+&lt;/tool_call&gt;</code></pre></div>
+      <p>The OpenAI client detects and parses this format automatically (tolerant of missing closing tags and a missing <code>&lt;tool_call&gt;</code> wrapper), then <b>strips the markup out of the user-visible text</b>. The result: tools work even on endpoints with no native tool support — your agent code is identical.</p>
+    </section>
+
+    <section id="rotation">
+      <h2>Key rotation</h2>
+      <p><code>apiKey</code> accepts a <b>function</b> evaluated per request, so you can spread calls across a pool of keys (handy for rate-limited free tiers):</p>
+      <div class="code"><pre><code class="language-ts">const keys = ['key_a', 'key_b', 'key_c']
+let i = 0
+const nextKey = () =&gt; keys[i++ % keys.length]
+
+const llm = createOpenAIClient({
+  baseUrl: 'https://ollama.com/v1',
+  model: 'qwen3-coder-next',
+  apiKey: nextKey,   // round-robin: every request uses the next key
+})</code></pre></div>
+      <p>Each <code>streamChat</code> call resolves the function fresh, so main-loop turns, sub-agents, and background tasks all rotate automatically.</p>
+    </section>
+
+    <section id="next">
+      <h2>Next</h2>
+      <div class="cards">
+        <div class="card"><h4><a href="tools.html">Tools →</a></h4><p>Built-in tools, file reading, and your own custom tools.</p></div>
+        <div class="card"><h4><a href="sandboxes.html">Sandboxes &amp; FS →</a></h4><p>Where the agent's tools actually run.</p></div>
+        <div class="card"><h4><a href="api.html">API reference →</a></h4><p>Every <code>query()</code> option and message type.</p></div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

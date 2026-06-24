@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deploy — anyclaude-sdk</title>
+  <meta name="description" content="Run anyclaude-sdk in the browser, on serverless functions (free tiers), or inside a long-lived sandbox." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.1.0 · MIT</div>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <div class="grp">Reference</div>
+      <a href="providers.html">LLM providers</a>
+      <a href="sandboxes.html">Sandboxes &amp; FS</a>
+      <a href="tools.html">Tools</a>
+      <a href="teams.html">Teams &amp; sub-agents</a>
+      <a href="mcp.html">MCP</a>
+      <a href="advanced.html">Sessions, hooks &amp; more</a>
+      <a href="api.html">API reference</a>
+      <div class="grp">Ship</div>
+      <a href="deploy.html" class="active">Deploy</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="top">
+      <h1>Deploy anywhere</h1>
+      <p class="tag">The SDK is headless and runtime-agnostic — the same code runs in a browser tab, a serverless function, or inside a long-lived sandbox. The only design question is <b>where the agent loop runs</b>, because that's what a function time limit applies to.</p>
+    </section>
+
+    <section id="browser">
+      <h2><i data-lucide="globe"></i> Pure browser — no backend</h2>
+      <p>Drive the agent straight from the tab against your LLM endpoint. Use a WebContainer (real Node + shell in the browser) or an in-memory/IndexedDB FS for file-only agents. Nothing server-side.</p>
+      <div class="code"><pre><code class="language-ts">import { query, createOpenAIClient } from 'anyclaude-sdk'
+import { WebContainerWorkspace } from 'anyclaude-sdk'
+
+const workspace = await WebContainerWorkspace.boot()
+const llm = createOpenAIClient({ baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o', apiKey: userKey })
+for await (const m of query({ prompt, workspace, llm, model: 'gpt-4o', includePartialMessages: true })) render(m)</code></pre></div>
+    </section>
+
+    <section id="serverless">
+      <h2><i data-lucide="cloud"></i> Recipe 1 — Serverless function (browser + function)</h2>
+      <p>Run <code>query()</code> in a serverless function; stream the <code>SDKMessage</code>s back to a browser client. Great for "no infra, free tier." The function's wall-clock cap bounds the agent loop, so checkpoint to a <a href="advanced.html">SessionStore</a> if a run can exceed it.</p>
+      <div class="code"><pre><code class="language-ts">// app/api/agent/route.ts  (Vercel function, streamed)
+import { query, createOpenAIClient, MemoryFileSystem, NoopCommandExecutor, composeWorkspace } from 'anyclaude-sdk'
+
+export const maxDuration = 300 // set ~10s below your platform's cap
+
+export async function POST(req: Request) {
+  const { prompt, sessionId } = await req.json()
+  const workspace = composeWorkspace(new MemoryFileSystem(), new NoopCommandExecutor(), '/work')
+  const llm = createOpenAIClient({ baseUrl: process.env.LLM_BASE, model: process.env.LLM_MODEL, apiKey: process.env.LLM_KEY })
+  const stream = new ReadableStream({
+    async start(c) {
+      for await (const m of query({ prompt, workspace, llm, model: process.env.LLM_MODEL })) c.enqueue(new TextEncoder().encode(JSON.stringify(m) + '\n'))
+      c.close()
+    },
+  })
+  return new Response(stream, { headers: { 'content-type': 'application/x-ndjson' } })
+}</code></pre></div>
+
+      <h3>Free-tier function limits</h3>
+      <p>Limits change — set <code>maxDuration</code> ~10s below your platform's configured cap. These are current free-tier defaults:</p>
+      <table class="opts">
+        <tr><th>Platform (free)</th><th>Limit model</th><th>Suggested budget</th></tr>
+        <tr><td>Vercel Hobby</td><td>wall-clock, ~300s (Fluid Compute)</td><td>~290s</td></tr>
+        <tr><td>Appwrite</td><td>wall-clock, 30s</td><td>~25s</td></tr>
+        <tr><td>Netlify</td><td>sync funcs ~10s (background up to 15 min)</td><td>~8s, or background funcs</td></tr>
+        <tr><td>Cloudflare Workers</td><td><b>CPU-time</b> (I/O waits are free)</td><td>I/O-bound agents rarely hit it; or use Durable Objects / Workflows</td></tr>
+        <tr><td>AWS Lambda</td><td>wall-clock, 15 min</td><td>~14m50s</td></tr>
+      </table>
+
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <h4><i data-lucide="life-buoy"></i> The "survivor" — span the cap <span class="pill">0.2.0 · coming soon</span></h4>
+        <p>For runs longer than your function's limit, the SDK will checkpoint at a <b>turn boundary</b> just before the deadline (<code>maxDurationMs</code>), persist to a pluggable <b>SessionStore</b> (Supabase / Neon / Vercel KV / Upstash Redis), and emit a <code>paused</code> event. A framework-agnostic client interceptor then fires a continuation request (<code>resume</code> + same <code>sessionId</code>) and stitches the streams into one — so a 30s Appwrite function can run an unlimited-length agent, transparently.</p>
+      </div>
+    </section>
+
+    <section id="sandbox-runtime">
+      <h2><i data-lucide="box"></i> Recipe 2 — Sandbox-as-runtime (no time limit)</h2>
+      <p>Run <code>query()</code> <i>inside</i> a long-lived sandbox (E2B, Vercel Sandbox, Daytona) and stream to the browser. The sandbox microVM is the compute, so there's no per-invocation function cap — the agent runs as long as the sandbox is alive (configurable, minutes to hours). Best for heavy / long autonomous runs. <b>No survivor needed.</b></p>
+      <div class="code"><pre><code class="language-ts">// runs in a process started inside the E2B sandbox
+import { query, LocalSandbox, createOpenAIClient } from 'anyclaude-sdk'
+
+const workspace = new LocalSandbox({ cwd: '/home/user' }) // local to the sandbox
+const llm = createOpenAIClient({ baseUrl: process.env.LLM_BASE, model: process.env.LLM_MODEL, apiKey: process.env.LLM_KEY })
+for await (const m of query({ prompt, workspace, llm, model: process.env.LLM_MODEL })) emit(m) // → exposed port → browser</code></pre></div>
+      <div class="card" style="border-left:3px solid var(--faint)">
+        <p><b>Gotcha:</b> if the loop runs in a <i>function</i> and only uses E2B for <i>tool execution</i>, the function's time limit still applies — the sandbox being alive doesn't save the orchestrator. The no-limit benefit requires the <i>loop itself</i> to run in the sandbox.</p>
+      </div>
+    </section>
+
+    <section id="hosting">
+      <h2><i data-lucide="upload"></i> Hosting the frontend</h2>
+      <p>The client UI is just static files (or a Vite/Next app). Deploy it anywhere — Vercel, Netlify, Cloudflare Pages, or Puter static hosting. This very docs site is served from Puter.</p>
+    </section>
+  </main>
+</div>
+</body>
+</html>

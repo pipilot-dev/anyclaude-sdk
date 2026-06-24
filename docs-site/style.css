@@ -108,3 +108,10 @@ footer a { color: var(--muted); }
   main { padding: 0 22px 80px; }
   .hero h1 { font-size: 34px; }
 }
+
+/* Multi-page docs portal: card grid + tab panes (descendant selector covers
+   both index's .tabpanes wrapper and the reference pages' direct .pane children) */
+.cards { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin: 18px 0; }
+.tabgroup { margin: 16px 0; }
+.tabgroup .pane { display: none; }
+.tabgroup .pane.active { display: block; }

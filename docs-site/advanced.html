@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sessions, hooks &amp; more — anyclaude-sdk</title>
+  <meta name="description" content="Sessions & resume, permissions, plan mode, lifecycle hooks, skills, memory, the message queue, slash commands, cost accounting, and auto-compaction in anyclaude-sdk." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.1.0 · MIT</div>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <div class="grp">Reference</div>
+      <a href="providers.html">LLM providers</a>
+      <a href="sandboxes.html">Sandboxes &amp; FS</a>
+      <a href="tools.html">Tools</a>
+      <a href="teams.html">Teams &amp; sub-agents</a>
+      <a href="mcp.html">MCP</a>
+      <a href="advanced.html" class="active">Sessions, hooks &amp; more</a>
+      <a href="api.html">API reference</a>
+      <div class="grp">Ship</div>
+      <a href="deploy.html">Deploy</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="top" class="hero">
+      <span class="pill"><i data-lucide="layers"></i> Advanced</span>
+      <h1>Sessions, hooks &amp; more</h1>
+      <p class="tag">The capabilities that turn the agent loop into a product: persistent <b>sessions</b>, fine-grained <b>permissions</b> and <b>plan mode</b>, lifecycle <b>hooks</b>, <b>skills</b> and <b>memory</b>, a live <b>message queue</b>, <b>slash commands</b>, <b>cost</b> accounting, and <b>auto-compaction</b>. Every one is an opt-in option on <code>query()</code>.</p>
+    </section>
+
+    <section id="sessions">
+      <h2>Sessions &amp; resume</h2>
+      <p>Persist the full transcript per turn and pick it up later. The built-in <code>SessionStore</code> writes session metadata + the LLM transcript to <b>IndexedDB</b> (via Dexie), so <code>list</code> / <code>resume</code> / <code>fork</code> / <code>rename</code> survive reloads. Pass a store, a stable <code>sessionId</code>, and <code>resume: true</code>.</p>
+      <div class="code"><pre><code class="language-ts">import { query, SessionStore } from 'anyclaude-sdk'
+
+const store = new SessionStore()                 // IndexedDB-backed (browser)
+const sessionId = 'project-alpha'
+
+for await (const m of query({
+  prompt: 'continue where we left off',
+  workspace, llm,
+  sessionStore: store,
+  sessionId,
+  resume: true,                                  // reload this session's transcript first
+})) { /* … */ }
+
+// Manage sessions
+const sessions = await store.list()              // SessionMeta[] (id, messageCount, updatedAt…)
+const loaded   = await store.load(sessionId)     // ChatMsg[] | null
+await store.rename(sessionId, 'Alpha build')
+await store.fork(sessionId, 'project-alpha-2')
+await store.remove(sessionId)</code></pre></div>
+      <p>A transcript is an array of <code>ChatMsg</code> (<code>{ role, content }</code>, where <code>content</code> is a string or an array of content blocks — text / tool_use / tool_result / image / document). <code>SessionStore</code> is an interface: implement <code>load</code>/<code>save</code>/<code>list</code> against any backend (a Node file store, Postgres, KV, Redis) to persist outside the browser — see <a href="deploy.html">Deploy</a>.</p>
+    </section>
+
+    <section id="permissions">
+      <h2>Permissions</h2>
+      <p>Gate every tool call. Two ways, often combined: declarative <b>rules</b> and an imperative <b>callback</b>.</p>
+      <h3>Permission rules</h3>
+      <p><code>permissionRules</code> takes <code>allow</code> / <code>deny</code> / <code>ask</code> lists of rule strings matched against tool calls (by tool name, with optional argument patterns). <b>Deny always wins</b> — a matching <code>deny</code> rule blocks the call even under <code>bypassPermissions</code>. A built-in <b>dangerous-bash backstop</b> flags destructive shell commands.</p>
+      <div class="code"><pre><code class="language-ts">for await (const m of query({
+  prompt, workspace, llm,
+  permissionMode: 'default',
+  permissionRules: {
+    allow: ['read_file', 'glob', 'grep', 'bash(npm run test)'],
+    deny:  ['bash(rm *)', 'delete_file'],          // deny wins, always
+    ask:   ['write_file', 'edit_file'],            // prompt the user
+  },
+  onPermissionAsk: async (tool, input) => confirm(`Allow ${tool}?`),
+})) { /* … */ }</code></pre></div>
+      <h3>Permission modes</h3>
+      <div class="cards">
+        <div class="card"><h4><code>default</code></h4><p>Rules + <code>ask</code> prompts apply.</p></div>
+        <div class="card"><h4><code>acceptEdits</code></h4><p>Auto-allow file edits; still gate the rest.</p></div>
+        <div class="card"><h4><code>plan</code></h4><p>Research only — mutating tools blocked (see Plan mode).</p></div>
+        <div class="card"><h4><code>bypassPermissions</code></h4><p>Allow everything <i>except</i> explicit <code>deny</code> rules.</p></div>
+        <div class="card"><h4><code>dontAsk</code></h4><p>Apply rules but never prompt (deny on would-ask).</p></div>
+      </div>
+      <p>For full control, supply <code>canUseTool(name, input)</code> directly — it runs before each call and returns an allow/deny decision.</p>
+    </section>
+
+    <section id="plan-mode">
+      <h2>Plan mode</h2>
+      <p>In plan mode the agent researches and proposes, but cannot mutate. The <code>enter_plan_mode</code> / <code>exit_plan_mode</code> tools toggle it, and while active all mutating tools (write/edit/delete/bash-writes) are denied by the gate. Start in plan mode with <code>permissionMode: 'plan'</code>, or let the model enter it on demand.</p>
+      <div class="code"><pre><code class="language-ts">import { query, PLAN_MODE_TOOLS, enterPlanMode, exitPlanMode } from 'anyclaude-sdk'
+
+query({ prompt: 'design the refactor', workspace, llm, permissionMode: 'plan' })
+// The agent calls exit_plan_mode with a finalized plan when ready to act.</code></pre></div>
+    </section>
+
+    <section id="hooks">
+      <h2>Lifecycle hooks</h2>
+      <p>Observe and intervene at every stage. <code>hooks</code> maps an event name to an array of callbacks; a <code>PreToolUse</code> hook can even block or inject context. All 15 events:</p>
+      <div class="cards">
+        <div class="card"><h4>PreToolUse</h4><p>Before a tool runs — may block or add context.</p></div>
+        <div class="card"><h4>PostToolUse</h4><p>After a tool returns successfully.</p></div>
+        <div class="card"><h4>PostToolUseFailure</h4><p>After a tool errors.</p></div>
+        <div class="card"><h4>PermissionRequest</h4><p>A tool call is awaiting a decision.</p></div>
+        <div class="card"><h4>PermissionDenied</h4><p>A call was denied by the gate.</p></div>
+        <div class="card"><h4>FileChanged</h4><p>A file was written/edited/deleted.</p></div>
+        <div class="card"><h4>UserPromptSubmit</h4><p>A user turn entered the loop.</p></div>
+        <div class="card"><h4>Notification</h4><p>An agent notification fired.</p></div>
+        <div class="card"><h4>Stop</h4><p>The turn finished.</p></div>
+        <div class="card"><h4>SessionStart / SessionEnd</h4><p>Run lifecycle boundaries.</p></div>
+        <div class="card"><h4>SubagentStart / SubagentStop</h4><p>A sub-agent began / finished.</p></div>
+        <div class="card"><h4>PreCompact / PostCompact</h4><p>Around transcript compaction.</p></div>
+      </div>
+      <div class="code"><pre><code class="language-ts">query({
+  prompt, workspace, llm,
+  hooks: {
+    PreToolUse: [(input) => { console.log('about to run', input.tool_name) }],
+    PostCompact: [() => { console.log('context compacted — token budget reset') }],
+    Stop: [(input) => { console.log('done:', input.last_assistant_message) }],
+  },
+})</code></pre></div>
+    </section>
+
+    <section id="skills">
+      <h2>Skills</h2>
+      <p>Skills are Markdown prompt templates the agent can invoke as slash commands. Set <code>skills: true</code> to auto-load <code>.claude/skills/*.md</code> from the workspace, or pass your own <code>Skill[]</code>.</p>
+      <div class="code"><pre><code class="language-ts">import { query, loadSkillsFromFs } from 'anyclaude-sdk'
+
+// auto-load from .claude/skills/*.md
+query({ prompt, workspace, llm, skills: true })
+
+// or load explicitly / supply your own
+const skills = await loadSkillsFromFs(workspace)
+query({ prompt, workspace, llm, skills })</code></pre></div>
+      <p>Each loaded skill (<code>{ name, description, argumentHint, prompt }</code>) appears as <code>/name</code> and expands its template into the conversation.</p>
+    </section>
+
+    <section id="memory">
+      <h2>Memory</h2>
+      <p>A persistent <code>MemoryStore</code> whose entries are rendered into the system prompt each run and are editable by the agent via memory tools (<code>memory_write</code> / <code>memory_list</code> / <code>memory_delete</code>). Use it for durable facts, preferences, and project context that should survive across sessions.</p>
+      <div class="code"><pre><code class="language-ts">import { query, MemoryStore } from 'anyclaude-sdk'
+
+const memory = new MemoryStore(/* options */)
+query({ prompt, workspace, llm, memory })   // entries load into the prompt; tools can edit them</code></pre></div>
+    </section>
+
+    <section id="queue">
+      <h2>Message queue</h2>
+      <p>Type while the agent works. Push follow-up messages into a live run with <code>MessageQueue</code>; the loop drains them <b>one per turn boundary</b> — each queued message is injected as a user turn before the next LLM call, and a turn that would otherwise end keeps going while the queue is non-empty.</p>
+      <div class="code"><pre><code class="language-ts">import { query, MessageQueue } from 'anyclaude-sdk'
+
+const queue = new MessageQueue()
+const run = query({ prompt: 'build the landing page', workspace, llm, messageQueue: queue })
+
+// …meanwhile, the user types a follow-up; it's delivered at the next turn boundary
+queue.push('also add a dark mode toggle')
+
+for await (const m of run) { /* render */ }</code></pre></div>
+    </section>
+
+    <section id="commands">
+      <h2>Slash commands</h2>
+      <p>Built-in commands run inside the loop when a user turn starts with <code>/</code>; their output arrives as a <code>system</code> message with <code>subtype: 'local_command_output'</code>. Merge your own with <code>commands</code>.</p>
+      <p><code>BUILTIN_COMMANDS</code> includes: <code>/help</code>, <code>/clear</code>, <code>/compact</code>, <code>/tools</code>, <code>/cost</code>, <code>/model</code>, <code>/sessions</code>, <code>/resume</code>, <code>/rename</code>, <code>/diff</code>, <code>/tasks</code>, <code>/board</code>, <code>/context</code>, <code>/files</code>, <code>/agents</code>, <code>/mcp</code>, <code>/permissions</code>, <code>/memory</code>, <code>/export</code>, <code>/review</code>, <code>/init</code>.</p>
+      <div class="code"><pre><code class="language-ts">import { query, BUILTIN_COMMANDS } from 'anyclaude-sdk'
+
+query({
+  prompt: '/cost',
+  workspace, llm,
+  commands: [
+    { name: 'deploy', description: 'Ship to prod', run: async (ctx) => ({ systemText: 'Deploying…' }) },
+  ],
+})
+// handle the result:
+//   if (m.type === 'system' && m.subtype === 'local_command_output') render(m.content)</code></pre></div>
+    </section>
+
+    <section id="cost">
+      <h2>Cost &amp; usage</h2>
+      <p>Every run ends with a <code>result</code> message carrying <code>usage</code> (input / output / cache-read / cache-creation tokens) and <code>total_cost_usd</code>, computed from a built-in pricing table covering the Claude, GPT, and Grok families (and free/local endpoints at $0).</p>
+      <div class="code"><pre><code class="language-ts">for await (const m of query({ prompt, workspace, llm })) {
+  if (m.type === 'result') {
+    console.log(m.usage)            // { input_tokens, output_tokens, cache_read_input_tokens, … }
+    console.log('$', m.total_cost_usd)
+  }
+}</code></pre></div>
+    </section>
+
+    <section id="compaction">
+      <h2>Auto-compaction</h2>
+      <p>Long runs can summarize themselves before hitting the context window. Enable <code>autoCompact</code>; tune the window and trigger point. When it fires it emits a <code>compact_boundary</code> system message (and runs <code>PreCompact</code>/<code>PostCompact</code> hooks).</p>
+      <div class="code"><pre><code class="language-ts">query({
+  prompt, workspace, llm,
+  autoCompact: true,
+  contextLimit: 200_000,      // tokens; defaults to the model's window
+  compactThreshold: 0.8,      // compact when the transcript passes 80% of the limit
+})</code></pre></div>
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <p><i data-lucide="info"></i> Compaction is a turn-boundary operation, so it never interrupts a tool mid-flight. Pair it with a persistent <a href="#sessions">session</a> for unbounded multi-turn runs.</p>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>
