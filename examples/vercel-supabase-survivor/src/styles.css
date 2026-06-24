@@ -1,0 +1,10 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #0d1117; color: #e4e4e4; font: 15px/1.5 system-ui, sans-serif; }
+.app { max-width: 820px; margin: 0 auto; height: 100vh; display: flex; flex-direction: column; padding: 16px; gap: 10px; }
+.bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid #232c3d; }
+.status { font-size: 13px; color: #99a3b3; font-family: ui-monospace, monospace; }
+.status-paused { color: #4dd0e1; }
+.status-running { color: #7c83ff; }
+/* The transcript fills the space; the composer stays pinned at the bottom. */
+.ac-transcript { flex: 1; overflow-y: auto; }

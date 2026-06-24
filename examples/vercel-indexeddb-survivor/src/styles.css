@@ -1,0 +1,31 @@
+:root {
+  --bg: #0f1117;
+  --panel: #171a23;
+  --border: #262b38;
+  --fg: #e6e9ef;
+  --muted: #99a3b3;
+  --accent: #4dd0e1;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 ui-sans-serif, system-ui, sans-serif; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 28px 18px 80px; }
+header { display: flex; align-items: center; gap: 12px; }
+h1 { font-size: 19px; margin: 0; }
+.sub { color: var(--muted); font-size: 14px; }
+.badge { font-family: ui-monospace, monospace; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+.badge.running { color: #0c0f16; background: var(--accent); border-color: var(--accent); }
+.badge.paused { color: #0c0f16; background: #ffd166; border-color: #ffd166; }
+.transcript { display: flex; flex-direction: column; gap: 12px; margin: 22px 0; }
+.msg { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.msg.user { border-color: #2c3a2e; }
+.msg b { color: var(--accent); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.tool { font-family: ui-monospace, monospace; font-size: 13px; color: var(--muted); }
+.tool .pill { color: #7aa2f7; }
+.tool .result { color: var(--muted); }
+.working { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; }
+.working .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: .3; } 50% { opacity: 1; } }
+.composer { position: fixed; bottom: 0; left: 0; right: 0; display: flex; gap: 8px; padding: 14px; background: var(--bg); border-top: 1px solid var(--border); }
+.composer input { flex: 1; max-width: 660px; margin: 0 auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px; color: var(--fg); font-size: 15px; }
+.composer button { background: var(--accent); color: #0c0f16; border: 0; border-radius: 10px; padding: 0 18px; font-weight: 600; cursor: pointer; }
+.composer button:disabled { opacity: .5; cursor: default; }

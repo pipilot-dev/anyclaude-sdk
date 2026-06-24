@@ -22,6 +22,7 @@ export { bash, readFile, writeFile, editFile, deleteFile, listFiles, glob, grep 
 export { multiEdit, notebookEdit, todoWrite, webFetch, webSearch, toolSearch, config }
 export { walk, globToRegExp, joinPath, DEFAULT_IGNORE } from './walk.js'
 export { defineTool, type DefineToolSpec } from './define.js'
+export { askUserQuestion } from './ask_user.js'
 
 /** Every built-in Claude Code tool, ready to pass to `query()`. */
 export const ALL_CLAUDE_CODE_TOOLS: Tool[] = [

@@ -93,6 +93,13 @@ export interface QueryOptions {
   permissionRules?: { allow?: string[]; deny?: string[]; ask?: string[] }
   /** Prompt callback for 'ask' permission decisions. */
   onPermissionAsk?: (toolName: string, input: Record<string, unknown>) => Promise<boolean>
+  /** Handler for the `ask_user_question` tool. When set, the tool is registered. */
+  onAskUser?: (q: {
+    question: string
+    header?: string
+    options: Array<{ label: string; description?: string }>
+    multiSelect?: boolean
+  }) => Promise<string | string[]>
   /** Load `.claude/settings.json` (project/local cascade), or pass a Settings object. */
   settings?: boolean | import('./settings/index.js').Settings
   /** Load `.claude/skills/*.md` as slash commands + a skill registry, or pass a Skill[]. */
@@ -155,6 +162,7 @@ export function query(options: QueryOptions): Query {
     memory: options.memory,
     permissionRules: options.permissionRules,
     onPermissionAsk: options.onPermissionAsk,
+    onAskUser: options.onAskUser,
     settings: options.settings,
     skills: options.skills,
   }) as Query

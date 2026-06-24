@@ -29,3 +29,7 @@ MEMORY.md
 
 # playwright MCP artifacts
 .playwright-mcp/
+
+# keep example env templates (placeholders only)
+!.env.example
+!**/.env.example

@@ -38,6 +38,7 @@ import type {
 import type { FileReadLimits, Tool, ToolContext } from './tools/types.js'
 import { ALL_CLAUDE_CODE_TOOLS, toolByName, toolDefs } from './tools/index.js'
 import { task as taskTool } from './tools/task.js'
+import { askUserQuestion } from './tools/ask_user.js'
 import { loadMcpServers, type McpServers, type McpProxy } from './mcp/index.js'
 import { runSlashCommand } from './commands/index.js'
 import type { SlashCommand } from './commands/index.js'
@@ -172,6 +173,13 @@ export interface AgentOptions {
   permissionRules?: { allow?: string[]; deny?: string[]; ask?: string[] }
   /** Prompt callback for 'ask' decisions; if absent, default mode allows / dontAsk denies. */
   onPermissionAsk?: (toolName: string, input: Record<string, unknown>) => Promise<boolean>
+  /** Surfaces `ask_user_question` to the host UI. When set, the tool is registered. */
+  onAskUser?: (q: {
+    question: string
+    header?: string
+    options: Array<{ label: string; description?: string }>
+    multiSelect?: boolean
+  }) => Promise<string | string[]>
   /** Load + apply `.claude/settings.json` (project/local cascade) under explicit options. true, or a Settings object. */
   settings?: boolean | Settings
   /** Load `.claude/skills/*.md` as slash commands + skill registry. true, or a Skill[] array. */
@@ -376,6 +384,9 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
     const present = new Set(localTools.map((t) => t.def.function.name))
     localTools = [...localTools, ...BACKGROUND_TOOLS.filter((t) => !present.has(t.def.function.name))]
   }
+  if (options.onAskUser && !localTools.some((t) => t.def.function.name === 'ask_user_question')) {
+    localTools = [...localTools, askUserQuestion]
+  }
   if (teamEnabled) {
     const present = new Set(localTools.map((t) => t.def.function.name))
     const teamSet = subagentsEnabled ? [...TEAM_TOOLS, ...TEAM_DISPATCH_TOOLS] : TEAM_TOOLS
@@ -431,6 +442,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
     signal,
     store,
     limits,
+    askUser: options.onAskUser,
     background,
     mailbox,
     board,
@@ -473,6 +485,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
         tools: subTools,
         model: def?.model ?? model,
         systemPrompt: subSystem,
+        onAskUser: options.onAskUser,
         maxTurns,
         cwd,
         abortController: childController,

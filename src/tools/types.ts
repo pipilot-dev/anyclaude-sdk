@@ -47,6 +47,13 @@ export interface ToolContext {
     /** Streamed progress (assistant text + tool names) as the sub-agent works. */
     onProgress?: (text: string) => void
   }) => Promise<{ text: string; isError?: boolean }>
+  /** Ask the user a multiple-choice question (wired from query({ onAskUser })). */
+  askUser?: (q: {
+    question: string
+    header?: string
+    options: Array<{ label: string; description?: string }>
+    multiSelect?: boolean
+  }) => Promise<string | string[]>
   /** Background task manager, present when background tasks are enabled. */
   background?: import('../background/manager.js').BackgroundTaskManager
   /** Inter-agent mailbox, present when teammates are enabled. Shared with sub-agents. */
