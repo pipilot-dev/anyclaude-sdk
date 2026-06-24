@@ -1,5 +1,6 @@
 // Syntax highlighting
 document.addEventListener('DOMContentLoaded', () => {
+  if (window.lucide) window.lucide.createIcons()
   if (window.hljs) document.querySelectorAll('pre code').forEach((el) => window.hljs.highlightElement(el))
 
   // Copy-to-clipboard buttons on every code block

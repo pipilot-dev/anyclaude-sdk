@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script defer src="app.js"></script>
 </head>
 <body>
@@ -39,7 +40,7 @@
       <p class="tag">A standalone, headless agent engine — tools, the tool loop, MCP, sub-agents, sessions — that runs against <b>any OpenAI- or Anthropic-compatible endpoint</b>, in the <b>browser</b> (WebContainer), <b>Node</b>, and <b>Bun</b>. No backend, no OAuth, no native binaries.</p>
       <div class="btns">
         <a class="btn primary" href="https://www.npmjs.com/package/anyclaude-sdk">↓ npm: anyclaude-sdk</a>
-        <a class="btn ghost" href="https://github.com/pipilot-dev/anyclaude-sdk">★ GitHub</a>
+        <a class="btn ghost" href="https://github.com/pipilot-dev/anyclaude-sdk"><i data-lucide="github"></i> GitHub</a>
       </div>
       <div class="code"><pre><code class="language-bash">npm install anyclaude-sdk</code></pre></div>
     </section>
@@ -49,12 +50,12 @@
       <h2>Why anyclaude</h2>
       <p class="lead">The same <code>query()</code> async-generator interface and <code>SDKMessage</code> envelope as the official Claude Agent SDK — but provider-agnostic and runtime-agnostic.</p>
       <div class="grid">
-        <div class="card"><div class="ic">🧠</div><h4>Headless engine</h4><p>Pure agent logic — bring your own UI (chatbot, research assistant, terminal agent). Zero framework lock-in.</p></div>
-        <div class="card"><div class="ic">🌐</div><h4>Browser, Node, Bun</h4><p>Runs in a WebContainer tab, a Node server, or a Bun process — the exact same code.</p></div>
-        <div class="card"><div class="ic">🔌</div><h4>Any LLM endpoint</h4><p>OpenAI, Anthropic, xAI, Groq, Together, OpenRouter, Ollama, or a local server. Three transport clients, one interface.</p></div>
-        <div class="card"><div class="ic">🧰</div><h4>Full toolset</h4><p>Files (text/image/PDF/notebook), shell, glob/grep, web fetch &amp; search, todos — plus your own custom tools.</p></div>
-        <div class="card"><div class="ic">🏖️</div><h4>Pluggable sandboxes</h4><p>WebContainer, E2B, Vercel, Daytona, Cloudflare, or the real local OS. A sandbox is just FS + exec.</p></div>
-        <div class="card"><div class="ic">🚫</div><h4>No backend required</h4><p>Drive an agent straight from the browser against your LLM key, or run it serverless — your choice.</p></div>
+        <div class="card"><div class="ic"><i data-lucide="cpu"></i></div><h4>Headless engine</h4><p>Pure agent logic — bring your own UI (chatbot, research assistant, terminal agent). Zero framework lock-in.</p></div>
+        <div class="card"><div class="ic"><i data-lucide="globe"></i></div><h4>Browser, Node, Bun</h4><p>Runs in a WebContainer tab, a Node server, or a Bun process — the exact same code.</p></div>
+        <div class="card"><div class="ic"><i data-lucide="plug"></i></div><h4>Any LLM endpoint</h4><p>OpenAI, Anthropic, xAI, Groq, Together, OpenRouter, Ollama, or a local server. Three transport clients, one interface.</p></div>
+        <div class="card"><div class="ic"><i data-lucide="wrench"></i></div><h4>Full toolset</h4><p>Files (text/image/PDF/notebook), shell, glob/grep, web fetch &amp; search, todos — plus your own custom tools.</p></div>
+        <div class="card"><div class="ic"><i data-lucide="box"></i></div><h4>Pluggable sandboxes</h4><p>WebContainer, E2B, Vercel, Daytona, Cloudflare, or the real local OS. A sandbox is just FS + exec.</p></div>
+        <div class="card"><div class="ic"><i data-lucide="server-off"></i></div><h4>No backend required</h4><p>Drive an agent straight from the browser against your LLM key, or run it serverless — your choice.</p></div>
       </div>
     </section>
 

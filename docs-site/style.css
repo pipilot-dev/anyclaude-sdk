@@ -65,7 +65,9 @@ p { max-width: 760px; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; }
 .card h4 { margin: 0 0 6px; font-size: 15.5px; }
 .card p { color: var(--muted); font-size: 14px; margin: 0; }
-.card .ic { font-size: 20px; }
+.card .ic { color: var(--accent); line-height: 0; }
+.card .ic svg { width: 26px; height: 26px; stroke-width: 1.75; }
+.btn i, .btn svg { width: 15px; height: 15px; vertical-align: -2px; }
 
 /* Code blocks */
 .code { position: relative; margin: 14px 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: #0d1117; }
