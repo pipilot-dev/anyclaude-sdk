@@ -1,0 +1,217 @@
+// Public entry point — mirrors @anthropic-ai/claude-agent-sdk's query().
+//
+// Returns an AsyncGenerator<SDKMessage>. Accepts either a single string prompt
+// or an async iterable of SDKUserMessage (for multi-turn / interactive use).
+
+import type {
+  AgentDefinition,
+  CanUseTool,
+  HookCallback,
+  HookEvent,
+  LLMClient,
+  PermissionMode,
+  SDKMessage,
+  SDKUserMessage,
+} from './types/index.js'
+import type { FileReadLimits, Tool } from './tools/types.js'
+import type { McpServers, McpProxy } from './mcp/index.js'
+import type { SlashCommand } from './commands/index.js'
+import type { SessionStore } from './session/index.js'
+import type { MemoryStore } from './memory/index.js'
+import { runAgent, type Workspace } from './agent.js'
+
+export interface QueryOptions {
+  /** A plain string (single turn) or a stream of user messages (multi-turn). */
+  prompt: string | AsyncIterable<SDKUserMessage>
+  /** Workspace implementing FileSystem + CommandExecutor (e.g. WebContainerWorkspace). */
+  workspace: Workspace
+  /** Any OpenAI/Anthropic-compatible LLM client. */
+  llm: LLMClient
+  /** Tools available to the agent. REPLACES the builtins. Defaults to ALL_CLAUDE_CODE_TOOLS. */
+  tools?: Tool[]
+  /** Custom tools ADDED to the builtins (use `defineTool`). Filtered by allowed/disallowedTools. */
+  extraTools?: Tool[]
+  model?: string
+  systemPrompt?: string
+  appendSystemPrompt?: string
+  allowedTools?: string[]
+  disallowedTools?: string[]
+  maxTurns?: number
+  cwd?: string
+  sessionId?: string
+  abortController?: AbortController
+  /** Permission gate invoked before each tool call. */
+  canUseTool?: CanUseTool
+  permissionMode?: PermissionMode
+  /** Lifecycle hooks keyed by event. */
+  hooks?: Partial<Record<HookEvent, HookCallback[]>>
+  /** File-read tuning passed to tools. */
+  limits?: Partial<FileReadLimits>
+  /** Custom sub-agents invokable via the `task` tool, keyed by type name. */
+  agents?: Record<string, AgentDefinition>
+  /** Max sub-agent nesting depth. Default 2. */
+  maxSubagentDepth?: number
+  /** External MCP servers (HTTP/SSE) or in-process SDK servers. */
+  mcpServers?: McpServers
+  /** Route remote MCP requests through a proxy (works around browser CORS). */
+  mcpProxy?: McpProxy
+  /** Custom slash commands (merged with built-ins like /help, /compact). */
+  commands?: SlashCommand[]
+  /** Enable background tasks (task_list/task_output/task_stop + task run_in_background). */
+  background?: boolean
+  /** Inject a shared BackgroundTaskManager so background tasks persist across turns. */
+  backgroundManager?: import('./background/index.js').BackgroundTaskManager
+  /** Queue for interjecting user messages into the live loop (delivered one per turn boundary). */
+  messageQueue?: import('./queue.js').MessageQueue
+  /** Emit `stream_event` partial-assistant messages (text deltas) as they arrive. */
+  includePartialMessages?: boolean
+  /** Enable teammate coordination (shared mailbox + task board + team tools + coordinator prompt). */
+  team?: boolean
+  /** Inject a shared Mailbox so team messaging persists across turns. */
+  mailbox?: import('./team/index.js').Mailbox
+  /** Inject a shared TaskBoard so the task board persists across turns. */
+  board?: import('./team/index.js').TaskBoard
+  /** This agent's name/label for messaging (default 'coordinator'). */
+  agentName?: string
+  /** Persist the transcript to this store (keyed by sessionId) for resume. */
+  sessionStore?: SessionStore
+  /** Load the stored transcript for sessionId before the first turn. */
+  resume?: boolean
+  /** Auto-compact the transcript when it nears the context limit. */
+  autoCompact?: boolean
+  /** Context window in tokens for auto-compaction (default: model window or 200k). */
+  contextLimit?: number
+  /** Fraction of the context limit that triggers compaction (default 0.8). */
+  compactThreshold?: number
+  /** Persistent memory store; entries load into the system prompt and are editable via memory tools. */
+  memory?: MemoryStore
+  /** Permission rules (allow/deny/ask rule strings) → builds a canUseTool gate. */
+  permissionRules?: { allow?: string[]; deny?: string[]; ask?: string[] }
+  /** Prompt callback for 'ask' permission decisions. */
+  onPermissionAsk?: (toolName: string, input: Record<string, unknown>) => Promise<boolean>
+  /** Load `.claude/settings.json` (project/local cascade), or pass a Settings object. */
+  settings?: boolean | import('./settings/index.js').Settings
+  /** Load `.claude/skills/*.md` as slash commands + a skill registry, or pass a Skill[]. */
+  skills?: boolean | import('./skills/index.js').Skill[]
+}
+
+/** An async iterator of SDK messages, augmented with session controls. */
+export interface Query extends AsyncGenerator<SDKMessage, void, void> {
+  /** Abort the in-flight run (stops the LLM stream and pending tools). */
+  interrupt(): void
+}
+
+export function query(options: QueryOptions): Query {
+  const prompt =
+    typeof options.prompt === 'string'
+      ? singlePrompt(options.prompt)
+      : options.prompt
+
+  const abortController = options.abortController ?? new AbortController()
+
+  const gen = runAgent({
+    prompt,
+    workspace: options.workspace,
+    llm: options.llm,
+    tools: options.tools,
+    extraTools: options.extraTools,
+    model: options.model,
+    systemPrompt: options.systemPrompt,
+    appendSystemPrompt: options.appendSystemPrompt,
+    allowedTools: options.allowedTools,
+    disallowedTools: options.disallowedTools,
+    maxTurns: options.maxTurns,
+    cwd: options.cwd,
+    sessionId: options.sessionId,
+    abortController,
+    canUseTool: options.canUseTool,
+    permissionMode: options.permissionMode,
+    hooks: options.hooks,
+    limits: options.limits,
+    agents: options.agents,
+    maxSubagentDepth: options.maxSubagentDepth,
+    mcpServers: options.mcpServers,
+    mcpProxy: options.mcpProxy,
+    commands: options.commands,
+    background: options.background,
+    backgroundManager: options.backgroundManager,
+    messageQueue: options.messageQueue,
+    includePartialMessages: options.includePartialMessages,
+    team: options.team,
+    mailbox: options.mailbox,
+    board: options.board,
+    agentName: options.agentName,
+    sessionStore: options.sessionStore,
+    resume: options.resume,
+    autoCompact: options.autoCompact,
+    contextLimit: options.contextLimit,
+    compactThreshold: options.compactThreshold,
+    memory: options.memory,
+    permissionRules: options.permissionRules,
+    onPermissionAsk: options.onPermissionAsk,
+    settings: options.settings,
+    skills: options.skills,
+  }) as Query
+
+  gen.interrupt = () => abortController.abort()
+  return gen
+}
+
+/** Wrap a single text prompt into the async-iterable form runAgent expects. */
+export async function* singlePrompt(text: string): AsyncIterable<SDKUserMessage> {
+  yield {
+    type: 'user',
+    message: { role: 'user', content: text },
+    parent_tool_use_id: null,
+    timestamp: new Date().toISOString(),
+  }
+}
+
+/**
+ * A simple push-based prompt queue for interactive sessions. Feed user turns
+ * with `.push(text)` and end the conversation with `.end()`.
+ */
+export class PromptStream implements AsyncIterable<SDKUserMessage> {
+  private queue: SDKUserMessage[] = []
+  private resolvers: Array<(v: IteratorResult<SDKUserMessage>) => void> = []
+  private done = false
+
+  push(content: string | SDKUserMessage['message']['content']): void {
+    const message: SDKUserMessage = {
+      type: 'user',
+      message: {
+        role: 'user',
+        content: typeof content === 'string' ? content : content,
+      },
+      parent_tool_use_id: null,
+      timestamp: new Date().toISOString(),
+    }
+    const r = this.resolvers.shift()
+    if (r) r({ value: message, done: false })
+    else this.queue.push(message)
+  }
+
+  end(): void {
+    this.done = true
+    let r = this.resolvers.shift()
+    while (r) {
+      r({ value: undefined as unknown as SDKUserMessage, done: true })
+      r = this.resolvers.shift()
+    }
+  }
+
+  [Symbol.asyncIterator](): AsyncIterator<SDKUserMessage> {
+    return {
+      next: (): Promise<IteratorResult<SDKUserMessage>> => {
+        const queued = this.queue.shift()
+        if (queued) return Promise.resolve({ value: queued, done: false })
+        if (this.done)
+          return Promise.resolve({
+            value: undefined as unknown as SDKUserMessage,
+            done: true,
+          })
+        return new Promise((resolve) => this.resolvers.push(resolve))
+      },
+    }
+  }
+}

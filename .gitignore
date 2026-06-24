@@ -1,0 +1,22 @@
+# deps + build output (dist is rebuilt on publish via prepublishOnly)
+node_modules/
+dist/
+
+# internal / dev-only — NOT for the public SDK repo
+spec.md
+MEMORY.md
+/tui
+/tui-opentui
+/tui-opentui-spike
+/workspace
+.bcs/
+**/*.jsonl
+
+# secrets / env / logs
+.env
+.env.*
+*.log
+.DS_Store
+
+# editor/session config
+.claude/

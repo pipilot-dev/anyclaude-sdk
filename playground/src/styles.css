@@ -1,0 +1,93 @@
+:root {
+  --bg: #0b0e14;
+  --panel: #11151f;
+  --panel-2: #161b27;
+  --border: #232a3a;
+  --text: #cbd5e1;
+  --muted: #7c899e;
+  --accent: #4f9cf9;
+  --accent-2: #2dd4bf;
+  --err: #f87171;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.booting, .boot-error { padding: 32px; color: var(--muted); }
+.boot-error pre { background: var(--panel); padding: 12px; border-radius: 8px; color: var(--err); overflow: auto; }
+.boot-error code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; }
+
+/* Three-pane layout */
+.layout {
+  display: grid;
+  grid-template-columns: 40% 60%;
+  height: 100vh;
+  overflow: hidden;
+}
+.chat-col { border-right: 1px solid var(--border); min-width: 0; min-height: 0; overflow: hidden; }
+.work-col { display: grid; grid-template-rows: 65% 35%; min-width: 0; min-height: 0; overflow: hidden; }
+.work-top { display: grid; grid-template-columns: 220px 1fr; border-bottom: 1px solid var(--border); min-height: 0; }
+.work-bottom { min-height: 0; }
+
+/* Chat */
+.chat { display: flex; flex-direction: column; height: 100%; }
+.chat-settings { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); background: var(--panel); }
+.cfg { flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 8px; font-size: 12px; }
+.cfg.model { flex: 0 0 180px; }
+.messages { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.empty { color: var(--muted); font-style: italic; margin: auto; text-align: center; max-width: 280px; }
+
+.msg { padding: 8px 10px; border-radius: 8px; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+.msg.user { background: #1d2740; align-self: flex-end; max-width: 85%; }
+.msg.assistant { background: var(--panel-2); }
+.msg.tool { background: transparent; color: var(--accent-2); font-family: ui-monospace, monospace; font-size: 12px; padding: 2px 10px; }
+.msg.tool .args { color: var(--muted); margin-left: 4px; }
+.msg.tool-result { background: var(--panel); font-size: 12px; }
+.msg.tool-result summary { cursor: pointer; color: var(--muted); }
+.msg.tool-result.err summary { color: var(--err); }
+.msg.tool-result pre { margin: 6px 0 0; max-height: 200px; overflow: auto; color: var(--muted); }
+.msg.system { background: transparent; color: var(--muted); font-size: 12px; border-left: 2px solid var(--border); border-radius: 0; }
+.msg.result { background: #14241d; color: var(--accent-2); }
+.msg.result.err { background: #2a1717; color: var(--err); }
+.msg.result .meta { color: var(--muted); }
+
+.composer { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--border); background: var(--panel); }
+.composer textarea { flex: 1; resize: none; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px; font: inherit; }
+.composer button { padding: 0 16px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+.composer .send { background: var(--accent); color: #04101f; }
+.composer .send:disabled { opacity: 0.4; cursor: default; }
+.composer .stop { background: var(--err); color: #1a0606; }
+
+/* Explorer */
+.explorer { border-right: 1px solid var(--border); background: var(--panel); overflow: auto; min-height: 0; }
+.explorer-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; position: sticky; top: 0; background: var(--panel); }
+.explorer-head button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; }
+.tree { padding: 4px 0; font-size: 13px; }
+.row { padding: 2px 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.dir { color: var(--text); }
+.row.file { color: var(--muted); }
+.row.file:hover, .row.dir:hover { background: var(--panel-2); }
+.row.file.active { background: #1d2740; color: var(--text); }
+
+/* Editor */
+.editor { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.editor-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--panel); font-size: 12px; }
+.editor-path { flex: 1; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.editor-status { color: var(--accent-2); }
+.editor-head button { background: var(--accent); border: none; color: #04101f; border-radius: 6px; padding: 3px 12px; cursor: pointer; font-weight: 600; }
+.editor-head button:disabled { opacity: 0.4; cursor: default; }
+.editor-host { flex: 1; min-height: 0; overflow: hidden; }
+/* Keep CodeMirror clamped to its pane and scroll internally for long files. */
+.editor-host .cm-editor { height: 100%; }
+.editor-host .cm-scroller { overflow: auto; }
+
+/* Terminal */
+.terminal { display: flex; flex-direction: column; height: 100%; background: #0b0e14; min-height: 0; }
+.terminal-head { padding: 4px 10px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.terminal-host { flex: 1; min-height: 0; padding: 4px; }

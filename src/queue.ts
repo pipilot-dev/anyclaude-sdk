@@ -1,0 +1,63 @@
+// Message queue for interjecting user messages into a LIVE query loop.
+//
+// While the agent is busy (streaming, running tools across multiple turns), the
+// app can `push()` follow-up user messages. The agent drains them ONE PER TURN
+// BOUNDARY — each queued message is injected as a user turn before the next LLM
+// call, and a turn that would otherwise end (no tool calls) continues if the
+// queue is non-empty. This mirrors Claude Code's "type while it works" queueing.
+import type { ContentBlockParam } from './types/index.js'
+
+export type QueuedContent = string | ContentBlockParam[]
+
+export interface QueuedMessage {
+  content: QueuedContent
+  /** Epoch ms when enqueued. */
+  at: number
+}
+
+export class MessageQueue {
+  private items: QueuedMessage[] = []
+  private listeners = new Set<(size: number) => void>()
+
+  /** Enqueue a user message to be delivered at the next turn boundary. */
+  push(content: QueuedContent): void {
+    this.items.push({ content, at: Date.now() })
+    this.emit()
+  }
+
+  /** Remove and return the oldest queued message (FIFO), or undefined if empty. */
+  shift(): QueuedMessage | undefined {
+    const m = this.items.shift()
+    if (m) this.emit()
+    return m
+  }
+
+  peek(): QueuedMessage | undefined {
+    return this.items[0]
+  }
+
+  get size(): number {
+    return this.items.length
+  }
+
+  /** Snapshot of pending messages (does not drain). */
+  list(): readonly QueuedMessage[] {
+    return this.items.slice()
+  }
+
+  clear(): void {
+    if (!this.items.length) return
+    this.items = []
+    this.emit()
+  }
+
+  /** Subscribe to size changes (push/shift/clear). Returns an unsubscribe fn. */
+  onChange(fn: (size: number) => void): () => void {
+    this.listeners.add(fn)
+    return () => this.listeners.delete(fn)
+  }
+
+  private emit(): void {
+    for (const fn of this.listeners) fn(this.items.length)
+  }
+}

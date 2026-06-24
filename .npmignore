@@ -1,0 +1,17 @@
+# Belt-and-suspenders: `files: ["dist"]` in package.json already whitelists the
+# publishable set, but this also blocks internal docs/artifacts if `files` is
+# ever loosened. Never publish specs, transcripts, the TUI packages, or keys.
+spec.md
+MEMORY.md
+*.md
+!README.md
+/src
+/tui
+/tui-opentui
+/tui-opentui-spike
+/workspace
+**/*.jsonl
+**/key-pools.*
+.env
+.env.*
+*.log
