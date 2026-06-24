@@ -9,11 +9,12 @@ The whole SDK is one entry point, `query(options)`, which returns an async gener
 - [Overview](https://anyclaude-docs.puter.site/index.html): What it is, why, quick start (browser/Node/Bun), core concepts.
 - [LLM providers](https://anyclaude-docs.puter.site/providers.html): The `LLMClient` interface; `createOpenAIClient` / `createAnthropicClient` / `createResponsesClient`; options (apiKey/baseUrl/model/headers/temperature/maxTokens/reasoningEffort/parallelToolCalls); recipes for OpenAI, Anthropic, xAI, Ollama, Kilo, Groq, Together, OpenRouter, local; inline tool-call parsing; key rotation.
 - [Sandboxes & filesystems](https://anyclaude-docs.puter.site/sandboxes.html): Workspace = FileSystem + CommandExecutor; `composeWorkspace`; WebContainer, LocalSandbox, E2B, Vercel, Daytona, Cloudflare; Memory/Dexie/OPFS filesystems.
-- [Tools](https://anyclaude-docs.puter.site/tools.html): All 15 built-in tools; multimodal file reading (text/image/PDF/notebook/binary) + `FileReadLimits`; custom tools via `defineTool` + `extraTools` (additive) vs `tools` (replace); `allowedTools`/`disallowedTools`.
+- [Tools](https://anyclaude-docs.puter.site/tools.html): All 15 built-in tools; multimodal file reading (text/image/PDF/notebook/binary) + `FileReadLimits`; custom tools via `defineTool` + `extraTools` (additive) vs `tools` (replace); `allowedTools`/`disallowedTools`; interactive `ask_user_question` (via `onAskUser`); client-side `clientTools` (pause with `client_tool_request` → resume with `clientToolResults`, e.g. browser runs `bash`).
 - [Teams & sub-agents](https://anyclaude-docs.puter.site/teams.html): The `task` tool; `agents` (AgentDefinition); background tasks (`BackgroundTaskManager`, task_list/output/stop); teammates/coordinator (`team`, Mailbox, TaskBoard, send_message, dispatch_tasks).
 - [MCP](https://anyclaude-docs.puter.site/mcp.html): External HTTP/SSE servers via `mcpServers`; in-process `createSdkMcpServer` + `tool`; CORS `mcpProxy`.
 - [Sessions, hooks & more](https://anyclaude-docs.puter.site/advanced.html): `sessionStore`/`resume`; permissions + plan mode; the 15 lifecycle hooks; skills; memory; `MessageQueue`; slash commands; cost/usage; auto-compaction.
-- [API reference](https://anyclaude-docs.puter.site/api.html): Full `QueryOptions` tables, the `SDKMessage` union, `PromptStream`, and key exports.
+- [API reference](https://anyclaude-docs.puter.site/api.html): Full `QueryOptions` tables (incl. `onAskUser`, `clientTools`/`clientToolResults`, `maxDurationMs`/`continueRun`), the `SDKMessage` union (incl. `paused` + `client_tool_request`), `PromptStream`, and key exports.
+- [React UI kit](https://anyclaude-docs.puter.site/react.html): `anyclaude-react` — `useAgent()`; `createAgentClient`/`createEndpointClient` (auto-stitch `paused` continuations); chat components `<AgentChat>`/`<ChatPanel>`/`<Transcript>`/`<MarkdownMessage>` (streamdown)/`<Composer>`/`<Working>`/`<ToolCall>`; IDE components `<Terminal>` (xterm)/`<FileExplorer>`/`<CodeEditor>` (CodeMirror); `<AskUser>`.
 - [Deploy](https://anyclaude-docs.puter.site/deploy.html): Browser (no backend); serverless functions with the "survivor" (`maxDurationMs` pause → persist to a SessionStore → `resume`+`continueRun`) for free-tier time caps (Vercel 300s / Appwrite 30s / Netlify 10s / Cloudflare CPU / Lambda 15m); sandbox-as-runtime (no limit).
 
 ## Key APIs
@@ -24,7 +25,8 @@ The whole SDK is one entry point, `query(options)`, which returns an async gener
 - Custom tools: `defineTool({ name, description, parameters, run })` → `query({ extraTools })`.
 - Interject mid-run: `MessageQueue` → `query({ messageQueue })` (one per turn boundary).
 - Survivor: `query({ maxDurationMs })` pauses + `query({ resume, continueRun })` continues; SessionStore adapters: `SessionStore` (IndexedDB), `MemorySessionStore`, `KVSessionStore`, `RedisSessionStore`, `PostgresSessionStore`, `SupabaseSessionStore`.
-- React: `anyclaude-react` — `useAgent()`, `<AgentChat>`, `<Transcript>`, `<Composer>`, `<Working>`; `createAgentClient`/`createEndpointClient` auto-stitch `paused` continuations.
+- Interactive: `query({ onAskUser })` enables the `ask_user_question` tool. Client-side execution: `query({ clientTools: ['bash'] })` pauses with `client_tool_request`; resume with `query({ resume, continueRun, clientToolResults })`.
+- React: `anyclaude-react` — `useAgent()`, `<AgentChat>`, `<ChatPanel>`, `<Transcript>`, `<MarkdownMessage>` (streamdown), `<Composer>`, `<Working>`, `<ToolCall>`, IDE `<Terminal>`/`<FileExplorer>`/`<CodeEditor>`, `<AskUser>`; `createAgentClient`/`createEndpointClient` auto-stitch `paused` continuations.
 
 ## Optional
 

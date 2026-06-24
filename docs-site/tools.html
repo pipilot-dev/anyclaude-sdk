@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.1.0 · MIT</div>
+    <div class="brand-sub">v0.3.0 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <div class="grp">Reference</div>
@@ -26,6 +26,7 @@
       <a href="mcp.html">MCP</a>
       <a href="advanced.html">Sessions, hooks &amp; more</a>
       <a href="api.html">API reference</a>
+      <a href="react.html">React UI kit</a>
       <div class="grp">Ship</div>
       <a href="deploy.html">Deploy</a>
     </nav>
@@ -159,6 +160,47 @@ query({ prompt, workspace, llm, model, disallowedTools: ['bash', 'delete_file'] 
 }</code></pre></div></div>
       </div>
       <p>Resolution order: start from <code>tools</code> (or built-ins) + <code>extraTools</code> → apply <code>allowedTools</code> → apply <code>disallowedTools</code>.</p>
+    </section>
+
+    <section id="ask-user">
+      <h2>Interactive questions — <code>ask_user_question</code></h2>
+      <p>Ported from Claude&nbsp;Code's <code>AskUserQuestion</code>. The agent can pause and ask the human a multiple-choice question instead of guessing. The tool is registered <b>only</b> when you pass an <code>onAskUser</code> handler to <code>query()</code> — your handler renders the prompt (CLI, web, the <code>&lt;AskUser&gt;</code> React component) and resolves with the chosen label(s).</p>
+      <div class="code"><pre><code class="language-ts">import { query } from 'anyclaude-sdk'
+
+for await (const msg of query({
+  prompt: 'Set up linting for this repo.',
+  workspace, llm, model,
+  onAskUser: async (q) =&gt; {
+    // q = { question, header?, options: [{ label, description? }], multiSelect? }
+    // return the chosen label, or string[] when q.multiSelect
+    return await promptTheUser(q)
+  },
+})) { /* … */ }</code></pre></div>
+      <p>If no <code>onAskUser</code> is provided the tool isn't offered, so the agent proceeds on its own. In the browser, wire <code>onAskUser</code> to the <a href="react.html#askuser"><code>&lt;AskUser&gt;</code></a> component.</p>
+    </section>
+
+    <section id="client-tools">
+      <h2>Client-side tools — <code>clientTools</code></h2>
+      <p>When the agent runs on a server but a tool must execute on the <b>client</b> (e.g. a browser running <code>bash</code> in a WebContainer, or touching device-local state), list those tool names in <code>clientTools</code>. The server stays the brain; the client is the hands.</p>
+      <p>When the model calls a client tool, the run emits <code>{ type: 'system', subtype: 'client_tool_request' }</code> with the tool name + input and <b>pauses</b>. The client executes it, then you resume the same session passing <code>clientToolResults</code> — the results are injected as the tool's output and the loop continues.</p>
+      <div class="tabgroup">
+        <div class="tabs"><button class="tab active">Server (pause on call)</button><button class="tab">Resume with results</button></div>
+        <div class="pane active"><div class="code"><pre><code class="language-ts">for await (const msg of query({
+  prompt, workspace, llm, model, sessionId,
+  clientTools: ['bash'],   // these run on the client
+})) {
+  if (msg.type === 'system' &amp;&amp; msg.subtype === 'client_tool_request') {
+    // msg.requests = [{ id, name, input }] — send to the client, then resume
+  }
+}</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">query({
+  workspace, llm, model, sessionId,
+  resume: true, continueRun: true,
+  clientTools: ['bash'],
+  clientToolResults: [{ id, content: stdoutFromBrowser }],
+})</code></pre></div></div>
+      </div>
+      <p>See the <a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-clienttools">vercel-clienttools example</a> — a serverless agent whose <code>bash</code> runs in the user's browser via WebContainer.</p>
     </section>
 
     <section id="large-outputs">

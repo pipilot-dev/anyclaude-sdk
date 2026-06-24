@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.1.0 · MIT</div>
+    <div class="brand-sub">v0.3.0 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <div class="grp">Reference</div>
@@ -26,6 +26,7 @@
       <a href="mcp.html">MCP</a>
       <a href="advanced.html">Sessions, hooks &amp; more</a>
       <a href="api.html">API reference</a>
+      <a href="react.html">React UI kit</a>
       <div class="grp">Ship</div>
       <a href="deploy.html" class="active">Deploy</a>
     </nav>
@@ -97,6 +98,33 @@ const llm = createOpenAIClient({ baseUrl: process.env.LLM_BASE, model: process.e
 for await (const m of query({ prompt, workspace, llm, model: process.env.LLM_MODEL })) emit(m) // → exposed port → browser</code></pre></div>
       <div class="card" style="border-left:3px solid var(--faint)">
         <p><b>Gotcha:</b> if the loop runs in a <i>function</i> and only uses E2B for <i>tool execution</i>, the function's time limit still applies — the sandbox being alive doesn't save the orchestrator. The no-limit benefit requires the <i>loop itself</i> to run in the sandbox.</p>
+      </div>
+    </section>
+
+    <section id="client-tools">
+      <h2><i data-lucide="split"></i> Recipe 3 — Server brain, browser hands (clientTools)</h2>
+      <p>Keep your LLM key and the agent loop on the server, but execute specific tools <b>in the user's browser</b> — e.g. run <code>bash</code> in a WebContainer so the agent edits and runs real code on the client, no sandbox bill. List those names in <code>clientTools</code>: the run pauses with a <code>client_tool_request</code>, the browser executes them, and you resume with <code>clientToolResults</code>.</p>
+      <div class="code"><pre><code class="language-ts">// server function
+for await (const m of query({ prompt, workspace, llm, model, sessionId, clientTools: ['bash'] })) {
+  if (m.type === 'system' &amp;&amp; m.subtype === 'client_tool_request') return respond(m.requests) // → browser runs them
+  emit(m)
+}
+// next request — browser sends back results:
+query({ workspace, llm, model, sessionId, resume: true, continueRun: true,
+        clientTools: ['bash'], clientToolResults })</code></pre></div>
+      <p>Full working example: <a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-clienttools">vercel-clienttools</a>.</p>
+    </section>
+
+    <section id="examples">
+      <h2><i data-lucide="boxes"></i> Working examples</h2>
+      <p>Each is a runnable Vite project (Vercel-ready, or browser-only) in the repo's <code>examples/</code>:</p>
+      <div class="cards">
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/browser-ide">browser-ide</a></h4><p>WebContainer IDE — real shell + Node in the tab, file explorer, editor, terminal, chat. No backend.</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-clienttools">vercel-clienttools</a></h4><p>Serverless brain + browser-executed <code>bash</code> via clientTools.</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-kv-survivor">vercel-kv-survivor</a></h4><p>Survivor across the function cap with Vercel KV.</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-supabase-survivor">vercel-supabase-survivor</a></h4><p>Survivor with Supabase as the SessionStore.</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-indexeddb-survivor">vercel-indexeddb-survivor</a></h4><p>Stateless function + browser IndexedDB session + survivor.</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/browser-chat">browser-chat</a></h4><p>Minimal browser chatbot with <code>useAgent</code>.</p></div>
       </div>
     </section>
 

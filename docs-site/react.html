@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>React UI kit — anyclaude-sdk</title>
+  <meta name="description" content="anyclaude-react — restylable React hooks + components (useAgent, ChatPanel, Terminal, FileExplorer, CodeEditor, AskUser) with serverless survivor stitching." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.3.0 · MIT</div>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <div class="grp">Reference</div>
+      <a href="providers.html">LLM providers</a>
+      <a href="sandboxes.html">Sandboxes &amp; FS</a>
+      <a href="tools.html">Tools</a>
+      <a href="teams.html">Teams &amp; sub-agents</a>
+      <a href="mcp.html">MCP</a>
+      <a href="advanced.html">Sessions, hooks &amp; more</a>
+      <a href="api.html">API reference</a>
+      <a href="react.html" class="active">React UI kit</a>
+      <div class="grp">Ship</div>
+      <a href="deploy.html">Deploy</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="top">
+      <h1>React UI kit — <code>anyclaude-react</code></h1>
+      <p class="tag">Restylable React hooks + components for building chatbots, agents, research assistants, and full browser IDEs on top of anyclaude-sdk — with built-in serverless <b>survivor</b> stream-stitching.</p>
+      <div class="code"><pre><code class="language-bash">npm install anyclaude-react   # peer: react >=18, anyclaude-sdk</code></pre></div>
+      <p>Optional default theme: <code>import 'anyclaude-react/styles.css'</code>. Everything is restylable — components take a <code>className</code> and read CSS variables (<code>--ac-bg</code>, <code>--ac-accent</code>, …), or skip the stylesheet and target the <code>.ac-*</code> classes / Tailwind.</p>
+    </section>
+
+    <section id="useagent">
+      <h2><i data-lucide="zap"></i> useAgent()</h2>
+      <p>The core hook. Drive it with one of <code>{ run }</code> (in-process, wraps <code>query()</code>), <code>{ endpoint }</code> (a serverless NDJSON endpoint), or a prebuilt <code>{ client }</code>.</p>
+      <div class="code"><pre><code class="language-tsx">import { useAgent } from 'anyclaude-react'
+import { query } from 'anyclaude-sdk/query'
+
+function Chat({ workspace, llm }) {
+  const { messages, streamingText, status, tokens, cost, send, interrupt, clear } = useAgent({
+    run: ({ prompt, sessionId, continueRun }) =>
+      query({ prompt, workspace, llm, model: 'gpt-4o', sessionId, resume: !!continueRun, continueRun, includePartialMessages: true }),
+  })
+  return /* render messages + an input that calls send(text) */
+}</code></pre></div>
+      <table class="opts">
+        <tr><th>Returns</th><th></th></tr>
+        <tr><td><code>messages</code></td><td>Accumulated <code>SDKMessage[]</code> (assistant / user / tool).</td></tr>
+        <tr><td><code>streamingText</code></td><td>Live text of the in-flight assistant turn (from <code>stream_event</code> deltas).</td></tr>
+        <tr><td><code>status</code></td><td><code>'idle' | 'running' | 'paused'</code> (paused = survivor mid-continuation).</td></tr>
+        <tr><td><code>tokens</code> / <code>cost</code></td><td>From the <code>result</code> message.</td></tr>
+        <tr><td><code>send(text)</code> · <code>interrupt()</code> · <code>clear()</code></td><td>Submit a turn · abort · reset.</td></tr>
+      </table>
+    </section>
+
+    <section id="clients">
+      <h2><i data-lucide="life-buoy"></i> Clients &amp; survivor stitching</h2>
+      <p>The clients yield one unified <code>AsyncIterable&lt;SDKMessage&gt;</code> per logical run. When a run emits <code>{type:'system',subtype:'paused'}</code> (the SDK hit <code>maxDurationMs</code>), the client transparently fires a continuation (<code>continueRun</code>, same <code>sessionId</code>) and keeps yielding — so a serverless function's time cap is invisible end-to-end.</p>
+      <div class="tabgroup">
+        <div class="tabs"><button class="tab active">In-process</button><button class="tab">Endpoint</button></div>
+        <div class="pane active"><div class="code"><pre><code class="language-ts">import { createAgentClient } from 'anyclaude-react'
+const client = createAgentClient({ run: ({ prompt, sessionId, continueRun }) => query({ /* … */ }) })
+useAgent({ client })</code></pre></div></div>
+        <div class="pane"><div class="code"><pre><code class="language-ts">import { createEndpointClient } from 'anyclaude-react'
+const client = createEndpointClient({ endpoint: '/api/agent' }) // POST → NDJSON stream
+useAgent({ client })   // or simply: useAgent({ endpoint: '/api/agent' })</code></pre></div></div>
+      </div>
+    </section>
+
+    <section id="chat-components">
+      <h2><i data-lucide="messages-square"></i> Chat components</h2>
+      <div class="cards">
+        <div class="card"><h4>&lt;AgentChat&gt;</h4><p>All-in-one: Transcript + Working + Composer wired to <code>useAgent</code> (takes its options).</p></div>
+        <div class="card"><h4>&lt;ChatPanel&gt;</h4><p>Like AgentChat with a header bar showing title + live status / tokens / cost.</p></div>
+        <div class="card"><h4>&lt;Transcript&gt;</h4><p>Renders the message list (text, tool pills).</p></div>
+        <div class="card"><h4>&lt;MarkdownMessage&gt;</h4><p>Assistant bubble rendered with <b>streamdown</b> (streaming-aware markdown + code). Override via <code>render</code>.</p></div>
+        <div class="card"><h4>&lt;Composer&gt;</h4><p>Textarea + send (Enter sends, Shift+Enter newline).</p></div>
+        <div class="card"><h4>&lt;Working&gt;</h4><p>Shimmering "Working…" indicator while running.</p></div>
+        <div class="card"><h4>&lt;ToolCall&gt;</h4><p>Collapsible tool call + result pill.</p></div>
+      </div>
+      <div class="code"><pre><code class="language-tsx">import { ChatPanel } from 'anyclaude-react'
+&lt;ChatPanel run={run} title="Assistant" placeholder="Ask anything…" /&gt;</code></pre></div>
+    </section>
+
+    <section id="ide-components">
+      <h2><i data-lucide="layout-panel-left"></i> IDE components</h2>
+      <p>For browser IDEs / agent workbenches. These need optional peers: <code>@xterm/xterm</code> + <code>@xterm/addon-fit</code> (Terminal) and <code>codemirror</code> + <code>@codemirror/*</code> (CodeEditor).</p>
+      <table class="opts">
+        <tr><th>Component</th><th>Key props</th></tr>
+        <tr><td><code>&lt;Terminal&gt;</code></td><td><code>spawn(size) =&gt; Promise&lt;ShellProcess&gt;</code> (a streaming shell — e.g. <code>wc.spawn('jsh',{terminal:size})</code>), <code>title?</code>, <code>fontSize?</code>, <code>className?</code></td></tr>
+        <tr><td><code>&lt;FileExplorer&gt;</code></td><td><code>list(dir) =&gt; Promise&lt;{name,isDir}[]&gt;</code>, <code>root?</code>, <code>openPath?</code>, <code>onOpen</code>, <code>refreshKey?</code>, <code>className?</code></td></tr>
+        <tr><td><code>&lt;CodeEditor&gt;</code></td><td><code>value</code>, <code>onChange?</code>, <code>language?</code>, <code>readOnly?</code>, <code>className?</code> (CodeMirror 6, controlled)</td></tr>
+      </table>
+      <div class="code"><pre><code class="language-tsx">import { WebContainer } from '@webcontainer/api'
+import { Terminal, FileExplorer, CodeEditor, ChatPanel } from 'anyclaude-react'
+
+const wc = await WebContainer.boot()
+&lt;Terminal spawn={(size) =&gt; wc.spawn('jsh', { terminal: size })} /&gt;
+&lt;FileExplorer list={(d) =&gt; wc.fs.readdir(d, { withFileTypes: true }).then(es =&gt; es.map(e =&gt; ({ name: e.name, isDir: e.isDirectory() })))} root="/home/projects" onOpen={open} /&gt;
+&lt;CodeEditor value={code} onChange={setCode} /&gt;</code></pre></div>
+      <p>See the <a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/browser-ide">browser-ide example</a> for the full wiring (real <code>jsh</code> shell + Node, no backend).</p>
+    </section>
+
+    <section id="askuser">
+      <h2><i data-lucide="circle-help"></i> &lt;AskUser&gt; — interactive questions</h2>
+      <p>Renders the SDK's <code>ask_user_question</code> tool as option buttons. Pass <code>onAskUser</code> to <code>query</code>, stash the question + resolver in state, render <code>&lt;AskUser&gt;</code>, and resolve from <code>onAnswer</code>.</p>
+      <div class="code"><pre><code class="language-tsx">import { AskUser, type AskUserQuestion } from 'anyclaude-react'
+
+const [q, setQ] = useState&lt;{ q: AskUserQuestion; resolve: (a: string | string[]) =&gt; void } | null&gt;(null)
+const onAskUser = (question) =&gt; new Promise((resolve) =&gt; setQ({ q: question, resolve }))
+// pass onAskUser to query({ … }), then:
+{q &amp;&amp; &lt;AskUser question={q.q} onAnswer={(a) =&gt; { q.resolve(a); setQ(null) }} /&gt;}</code></pre></div>
+    </section>
+
+    <section id="examples">
+      <h2><i data-lucide="boxes"></i> Examples</h2>
+      <div class="cards">
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/browser-ide">browser-ide</a></h4><p>WebContainer IDE — real shell + Node in the tab, all four IDE components.</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-clienttools">vercel-clienttools</a></h4><p>Serverless brain + browser-executed bash (client-side tools).</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-kv-survivor">vercel-kv-survivor</a></h4><p>Serverless survivor with Vercel KV.</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-supabase-survivor">vercel-supabase-survivor</a></h4><p>Serverless survivor with Supabase.</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-indexeddb-survivor">vercel-indexeddb-survivor</a></h4><p>Stateless function + browser IndexedDB session.</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/browser-chat">browser-chat</a></h4><p>Minimal browser chatbot.</p></div>
+      </div>
+    </section>
+  </main>
+</div>
+</body>
+</html>

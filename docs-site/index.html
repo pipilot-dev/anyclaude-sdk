@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.1.0 · MIT</div>
+    <div class="brand-sub">v0.3.0 · MIT</div>
     <nav class="nav">
       <a href="index.html" class="active">Overview</a>
       <div class="grp">Reference</div>
@@ -26,6 +26,7 @@
       <a href="mcp.html">MCP</a>
       <a href="advanced.html">Sessions, hooks &amp; more</a>
       <a href="api.html">API reference</a>
+      <a href="react.html">React UI kit</a>
       <div class="grp">Ship</div>
       <a href="deploy.html">Deploy</a>
     </nav>
@@ -220,7 +221,7 @@ for await (const msg of run) { /* render… */ }</code></pre></div>
           <tr><td>AWS Lambda</td><td>15&nbsp;min</td><td>Effectively unbounded for most agents</td></tr>
         </tbody>
       </table>
-      <div class="note warn"><b>Survivor continuation <span class="soon">coming in 0.2.0</span></b> — when a run approaches the function's limit, the agent checkpoints to a pluggable <code>SessionStore</code> (Supabase · Neon · Vercel KV · Upstash Redis) at a turn boundary, and a tiny framework-agnostic client transparently re-requests to continue in a fresh invocation. The user sees one continuous stream; a 30s function runs an unbounded agent. Default budget: ~10s under your platform's configured timeout, fully configurable.</div>
+      <div class="note warn"><b>Survivor continuation <span class="soon">shipped</span></b> — when a run approaches the function's limit, the agent checkpoints to a pluggable <code>SessionStore</code> (Supabase · Neon · Vercel KV · Upstash Redis · IndexedDB) at a turn boundary (<code>query({ maxDurationMs })</code>), and the <code>anyclaude-react</code> client transparently re-requests to continue in a fresh invocation (<code>resume</code> + <code>continueRun</code>). The user sees one continuous stream; a 30s function runs an unbounded agent. Default budget: ~10s under your platform's configured timeout, fully configurable. See <a href="deploy.html">Deploy</a>.</div>
 
       <h3>Recipe 2 — Sandbox-as-runtime (no time limit)</h3>
       <p>Run <code>query()</code> <b>inside</b> a long-lived sandbox (E2B / Vercel Sandbox / Daytona) and stream to the browser. The sandbox is the compute, so there's no per-request cap — the agent runs as long as the sandbox is alive.</p>
