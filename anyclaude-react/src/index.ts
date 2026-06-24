@@ -1,6 +1,14 @@
 // anyclaude-react — restylable React UI kit for anyclaude-sdk.
 export { createAgentClient, createEndpointClient } from './client.js'
-export type { AgentClient, RunFn, RunOptions, EndpointClientOptions } from './client.js'
+export type {
+  AgentClient,
+  RunFn,
+  RunOptions,
+  EndpointClientOptions,
+  ClientToolMap,
+  ClientToolExecutor,
+  ClientToolResult,
+} from './client.js'
 
 export { useAgent } from './useAgent.js'
 export type { UseAgentOptions, UseAgentResult, AgentStatus } from './useAgent.js'
@@ -19,3 +27,15 @@ export { Transcript } from './components/Transcript.js'
 export type { TranscriptProps } from './components/Transcript.js'
 export { AgentChat } from './components/AgentChat.js'
 export type { AgentChatProps } from './components/AgentChat.js'
+export { ChatPanel } from './components/ChatPanel.js'
+export type { ChatPanelProps } from './components/ChatPanel.js'
+
+// IDE-grade components (optional peer deps: @xterm/*, @codemirror/*)
+export { Terminal } from './components/Terminal.js'
+export type { TerminalProps, ShellProcess } from './components/Terminal.js'
+export { FileExplorer } from './components/FileExplorer.js'
+export type { FileExplorerProps, FileEntry } from './components/FileExplorer.js'
+export { CodeEditor } from './components/CodeEditor.js'
+export type { CodeEditorProps } from './components/CodeEditor.js'
+export { AskUser } from './components/AskUser.js'
+export type { AskUserProps, AskUserQuestion } from './components/AskUser.js'

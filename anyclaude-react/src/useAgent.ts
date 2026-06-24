@@ -1,7 +1,7 @@
 // React hook driving an agent run with live streaming + survivor stitching.
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { SDKMessage } from 'anyclaude-sdk'
-import { createAgentClient, createEndpointClient, type AgentClient, type RunFn } from './client.js'
+import { createAgentClient, createEndpointClient, type AgentClient, type RunFn, type ClientToolMap } from './client.js'
 
 export type AgentStatus = 'idle' | 'running' | 'paused'
 
@@ -11,6 +11,8 @@ export interface UseAgentOptions {
   run?: RunFn
   endpoint?: string
   headers?: Record<string, string>
+  /** Host executors for client-side tools (e.g. run `bash` on a WebContainer). */
+  clientTools?: ClientToolMap
   /** Stable id for this conversation (survivor continuation reuses it). Auto if omitted. */
   sessionId?: string
 }
@@ -35,8 +37,8 @@ function newSessionId(): string {
 
 function resolveClient(opts: UseAgentOptions): AgentClient {
   if (opts.client) return opts.client
-  if (opts.run) return createAgentClient({ run: opts.run })
-  if (opts.endpoint) return createEndpointClient({ endpoint: opts.endpoint, headers: opts.headers })
+  if (opts.run) return createAgentClient({ run: opts.run, clientTools: opts.clientTools })
+  if (opts.endpoint) return createEndpointClient({ endpoint: opts.endpoint, headers: opts.headers, clientTools: opts.clientTools })
   throw new Error('useAgent: provide one of `client`, `run`, or `endpoint`.')
 }
 
@@ -54,7 +56,7 @@ export function useAgent(opts: UseAgentOptions): UseAgentResult {
   const client = useMemo(
     () => resolveClient(opts),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [opts.client, opts.run, opts.endpoint, opts.headers]
+    [opts.client, opts.run, opts.endpoint, opts.headers, opts.clientTools]
   )
 
   const send = useCallback(

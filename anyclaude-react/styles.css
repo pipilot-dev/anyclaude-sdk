@@ -58,3 +58,49 @@
 .ac-composer-input:focus { outline: none; border-color: var(--ac-accent); }
 .ac-composer-send { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: var(--ac-accent); color: #00121a; border: 0; cursor: pointer; flex: none; }
 .ac-composer-send:disabled { opacity: 0.4; cursor: default; }
+
+/* ---- shared vars (so IDE components work outside .ac-chat) ---- */
+:root {
+  --ac-bg: #0d1117; --ac-fg: #e6edf3; --ac-muted: #8b949e; --ac-border: #232c3d;
+  --ac-accent: #4dd0e1; --ac-user: #5fd75f; --ac-panel: #161b22; --ac-radius: 12px;
+  --ac-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---- ChatPanel ---- */
+.ac-chatpanel { display: flex; flex-direction: column; height: 100%; background: var(--ac-bg); color: var(--ac-fg); font: 15px/1.55 system-ui, sans-serif; }
+.ac-chatpanel-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 14px; border-bottom: 1px solid var(--ac-border); font-size: 14px; }
+.ac-chatpanel-title { font-weight: 600; }
+.ac-chatpanel-stats { color: var(--ac-muted); font-family: var(--ac-mono); font-size: 12.5px; }
+.ac-status { text-transform: capitalize; }
+.ac-status-running { color: var(--ac-accent); }
+.ac-status-paused { color: #ffd75f; }
+
+/* ---- Terminal ---- */
+.ac-terminal { display: flex; flex-direction: column; height: 100%; background: #0b0e14; border: 1px solid var(--ac-border); border-radius: var(--ac-radius); overflow: hidden; }
+.ac-terminal-head { padding: 6px 12px; font-family: var(--ac-mono); font-size: 12px; color: var(--ac-muted); border-bottom: 1px solid var(--ac-border); }
+.ac-terminal-host { flex: 1; min-height: 0; padding: 6px; }
+
+/* ---- FileExplorer ---- */
+.ac-explorer { background: var(--ac-panel); border: 1px solid var(--ac-border); border-radius: var(--ac-radius); overflow: auto; font-size: 13px; color: var(--ac-fg); }
+.ac-explorer-head { padding: 8px 12px; font-weight: 600; color: var(--ac-muted); border-bottom: 1px solid var(--ac-border); }
+.ac-tree-row { padding: 4px 8px; cursor: pointer; white-space: nowrap; font-family: var(--ac-mono); }
+.ac-tree-row:hover { background: rgba(255,255,255,0.05); }
+.ac-tree-row.ac-active { background: rgba(77,208,225,0.16); color: var(--ac-accent); }
+.ac-tree-caret { opacity: 0.7; }
+.ac-dir { color: var(--ac-fg); }
+
+/* ---- CodeEditor ---- */
+.ac-editor-host { height: 100%; overflow: hidden; border: 1px solid var(--ac-border); border-radius: var(--ac-radius); }
+.ac-editor-host .cm-editor { height: 100%; }
+
+/* ---- AskUser ---- */
+.ac-askuser { border: 1px solid var(--ac-accent); border-radius: var(--ac-radius); background: var(--ac-panel); padding: 12px 14px; margin: 8px 0; }
+.ac-askuser-header { display: inline-block; font-family: var(--ac-mono); font-size: 11px; text-transform: uppercase; color: var(--ac-accent); margin-bottom: 4px; }
+.ac-askuser-question { font-weight: 600; margin-bottom: 10px; }
+.ac-askuser-options { display: flex; flex-direction: column; gap: 6px; }
+.ac-askuser-option { text-align: left; background: var(--ac-bg); border: 1px solid var(--ac-border); border-radius: 8px; padding: 8px 10px; color: var(--ac-fg); cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.ac-askuser-option:hover, .ac-askuser-option.ac-selected { border-color: var(--ac-accent); }
+.ac-askuser-label { font-weight: 600; }
+.ac-askuser-desc { color: var(--ac-muted); font-size: 13px; }
+.ac-askuser-submit { margin-top: 10px; background: var(--ac-accent); color: #001016; border: none; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+.ac-askuser-submit:disabled { opacity: 0.5; cursor: default; }

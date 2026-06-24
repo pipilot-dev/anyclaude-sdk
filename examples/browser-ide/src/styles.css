@@ -1,0 +1,19 @@
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: #0d1117; color: #e6edf3; font: 15px/1.5 system-ui, sans-serif; }
+.boot { display: grid; place-items: center; height: 100%; color: #8b949e; font-family: ui-monospace, monospace; }
+.ide { display: flex; flex-direction: column; height: 100%; }
+.ide-head { display: flex; align-items: baseline; gap: 12px; padding: 10px 16px; border-bottom: 1px solid #232c3d; }
+.ide-brand { font-weight: 700; color: #4dd0e1; }
+.ide-sub { color: #8b949e; font-size: 13px; }
+.ide-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 220px 1fr 380px; gap: 10px; padding: 10px; }
+.ide-files { height: 100%; min-height: 0; }
+.ide-center { display: grid; grid-template-rows: auto 1fr 240px; gap: 8px; min-height: 0; }
+.ide-editor-bar { display: flex; justify-content: space-between; align-items: center; font-family: ui-monospace, monospace; font-size: 12.5px; color: #8b949e; }
+.ide-editor-bar button { background: #161b22; color: #e6edf3; border: 1px solid #232c3d; border-radius: 7px; padding: 4px 12px; cursor: pointer; }
+.ide-editor-bar button:disabled { opacity: 0.5; }
+.ide-editor { min-height: 0; }
+.ide-term { min-height: 0; }
+.ide-chat { height: 100%; min-height: 0; border: 1px solid #232c3d; border-radius: 12px; overflow: hidden; }
+.ide-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: grid; place-items: center; padding: 20px; }
+.ide-overlay > * { max-width: 460px; width: 100%; }

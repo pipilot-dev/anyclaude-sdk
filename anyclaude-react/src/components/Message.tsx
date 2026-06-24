@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { renderMarkdown } from '../markdown.js'
+import { Streamdown } from 'streamdown'
 
 export interface MessageProps {
   role: 'user' | 'assistant'
@@ -21,15 +21,15 @@ export interface MarkdownMessageProps {
   text: string
   role?: 'user' | 'assistant'
   className?: string
-  /** Override the markdown renderer (default: built-in safe renderer). */
+  /** Override the markdown renderer (default: streamdown, streaming-aware). */
   render?: (text: string) => ReactNode
 }
 
-/** An assistant bubble whose text is rendered as markdown. */
+/** An assistant bubble whose text is rendered as markdown via streamdown. */
 export function MarkdownMessage({ text, role = 'assistant', className, render }: MarkdownMessageProps) {
   return (
     <Message role={role} className={`ac-msg-md${className ? ' ' + className : ''}`}>
-      {(render ?? renderMarkdown)(text)}
+      {render ? render(text) : <Streamdown>{text}</Streamdown>}
     </Message>
   )
 }

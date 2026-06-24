@@ -1,22 +1,100 @@
 {
   "name": "anyclaude-react",
-  "version": "0.1.0",
-  "description": "React UI kit for anyclaude-sdk — restylable hooks + components (useAgent, Transcript, Composer, AgentChat) with built-in serverless 'survivor' stream-stitching. Build chatbots, agents, research assistants.",
+  "version": "0.2.0",
+  "description": "React UI kit for anyclaude-sdk — restylable hooks + components (useAgent, Transcript, Composer, AgentChat, Terminal, FileExplorer, CodeEditor, ChatPanel, AskUser) with built-in serverless 'survivor' stream-stitching. Build chatbots, agents, research assistants, browser IDEs.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
     "./styles.css": "./styles.css"
   },
-  "files": ["dist", "styles.css"],
-  "sideEffects": ["*.css"],
-  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit", "prepublishOnly": "npm run build" },
-  "keywords": ["anyclaude", "claude", "agent", "react", "ai-chat", "chatbot", "ui", "hooks"],
+  "files": [
+    "dist",
+    "styles.css"
+  ],
+  "sideEffects": [
+    "*.css",
+    "@xterm/xterm/css/xterm.css"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "anyclaude",
+    "claude",
+    "agent",
+    "react",
+    "ai-chat",
+    "chatbot",
+    "ui",
+    "hooks",
+    "terminal",
+    "ide",
+    "codemirror",
+    "xterm"
+  ],
   "license": "MIT",
   "author": "Hans Ade <anye.happiness@swisslinkedu.com>",
-  "repository": { "type": "git", "url": "git+https://github.com/pipilot-dev/anyclaude-sdk.git", "directory": "anyclaude-react" },
-  "peerDependencies": { "react": ">=18", "anyclaude-sdk": ">=0.1.0" },
-  "devDependencies": { "@types/react": "^18.3.0", "react": "^18.3.1", "typescript": "^5.4.0" }
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pipilot-dev/anyclaude-sdk.git",
+    "directory": "anyclaude-react"
+  },
+  "peerDependencies": {
+    "@codemirror/commands": ">=6.0.0",
+    "@codemirror/lang-javascript": ">=6.0.0",
+    "@codemirror/state": ">=6.0.0",
+    "@codemirror/view": ">=6.0.0",
+    "@xterm/addon-fit": ">=0.10.0",
+    "@xterm/xterm": ">=5.3.0",
+    "anyclaude-sdk": ">=0.1.0",
+    "codemirror": ">=6.0.0",
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "@xterm/xterm": {
+      "optional": true
+    },
+    "@xterm/addon-fit": {
+      "optional": true
+    },
+    "codemirror": {
+      "optional": true
+    },
+    "@codemirror/view": {
+      "optional": true
+    },
+    "@codemirror/state": {
+      "optional": true
+    },
+    "@codemirror/commands": {
+      "optional": true
+    },
+    "@codemirror/lang-javascript": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@codemirror/commands": "^6.7.1",
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.34.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "streamdown": "^2.5.0"
+  }
 }

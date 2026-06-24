@@ -40,3 +40,7 @@ npm run build    # → dist/  (static)
 It's a fully static site — drop `dist/` on Vercel, Netlify, Cloudflare Pages, GitHub Pages, or
 any static host. **No serverless function needed** (the agent runs client-side). Note: a browser
 LLM call exposes the key to the client, so only ship a real key for keyless/proxied endpoints.
+
+## Want real code execution?
+
+This minimal example uses an in-memory FS with **no shell** (chat + file edits only). For an agent that actually **runs code in the browser** (real `jsh` shell + Node via WebContainer, plus a terminal / file explorer / editor UI), see [`../browser-ide`](../browser-ide).
