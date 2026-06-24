@@ -5,4 +5,4 @@
 // reloads.
 
 export { SessionStore } from './store.js'
-export type { SessionMeta, StoredSession, SessionStoreOptions } from './types.js'
+export type { SessionMeta, StoredSession, SessionStoreOptions, SessionStoreLike } from './types.js'

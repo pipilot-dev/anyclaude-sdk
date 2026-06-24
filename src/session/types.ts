@@ -23,3 +23,23 @@ export interface SessionStoreOptions {
   /** IndexedDB database name. Default: 'bcs-sessions'. */
   dbName?: string
 }
+
+/**
+ * Minimal pluggable session store — implement this to back persistence with any
+ * database (Supabase, Neon/Postgres, Vercel KV, Upstash Redis, files, …). The
+ * agent loop only needs `load` + `save`; the rest are for UIs/management.
+ */
+export interface SessionStoreLike {
+  /** Return the stored transcript for a session, or null if none. */
+  load(sessionId: string): Promise<ChatMsg[] | null>
+  /** Persist the transcript (called after each turn + on a paused boundary). */
+  save(sessionId: string, transcript: ChatMsg[], meta?: { title?: string; model?: string }): Promise<void>
+  /** Optional: list sessions (metadata only). */
+  list?(): Promise<SessionMeta[]>
+  /** Optional: full stored session. */
+  get?(sessionId: string): Promise<StoredSession | null>
+  /** Optional: rename a session. */
+  rename?(sessionId: string, title: string): Promise<void>
+  /** Optional: delete a session. */
+  remove?(sessionId: string): Promise<void>
+}

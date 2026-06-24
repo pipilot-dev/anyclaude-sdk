@@ -16,7 +16,7 @@ import type {
 import type { FileReadLimits, Tool } from './tools/types.js'
 import type { McpServers, McpProxy } from './mcp/index.js'
 import type { SlashCommand } from './commands/index.js'
-import type { SessionStore } from './session/index.js'
+import type { SessionStoreLike } from './session/index.js'
 import type { MemoryStore } from './memory/index.js'
 import { runAgent, type Workspace } from './agent.js'
 
@@ -37,6 +37,10 @@ export interface QueryOptions {
   allowedTools?: string[]
   disallowedTools?: string[]
   maxTurns?: number
+  /** Wall-clock budget (ms): pause at a turn boundary past this + emit `paused` (survivor). */
+  maxDurationMs?: number
+  /** Resume + continue the tool loop with no new user message (after a `paused` boundary). */
+  continueRun?: boolean
   cwd?: string
   sessionId?: string
   abortController?: AbortController
@@ -74,7 +78,7 @@ export interface QueryOptions {
   /** This agent's name/label for messaging (default 'coordinator'). */
   agentName?: string
   /** Persist the transcript to this store (keyed by sessionId) for resume. */
-  sessionStore?: SessionStore
+  sessionStore?: SessionStoreLike
   /** Load the stored transcript for sessionId before the first turn. */
   resume?: boolean
   /** Auto-compact the transcript when it nears the context limit. */
@@ -121,6 +125,8 @@ export function query(options: QueryOptions): Query {
     allowedTools: options.allowedTools,
     disallowedTools: options.disallowedTools,
     maxTurns: options.maxTurns,
+    maxDurationMs: options.maxDurationMs,
+    continueRun: options.continueRun,
     cwd: options.cwd,
     sessionId: options.sessionId,
     abortController,

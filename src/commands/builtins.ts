@@ -138,7 +138,7 @@ const sessions: SlashCommand = {
   name: 'sessions',
   description: 'List saved sessions',
   async run(_args, ctx): Promise<SlashOutcome> {
-    if (!ctx.sessionStore) return { systemText: 'No session store configured.' }
+    if (!ctx.sessionStore?.list) return { systemText: 'No session store configured.' }
     const list = await ctx.sessionStore.list()
     if (!list.length) return { systemText: 'No saved sessions.' }
     const lines = list.map(
@@ -167,7 +167,7 @@ const rename: SlashCommand = {
   description: 'Rename the current session',
   argumentHint: '<title>',
   async run(args, ctx): Promise<SlashOutcome> {
-    if (!ctx.sessionStore || !ctx.sessionId) return { systemText: 'No active session to rename.' }
+    if (!ctx.sessionStore?.rename || !ctx.sessionId) return { systemText: 'No active session to rename.' }
     const title = args.trim()
     if (!title) return { systemText: 'Usage: /rename <title>' }
     await ctx.sessionStore.rename(ctx.sessionId, title)

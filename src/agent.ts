@@ -45,7 +45,7 @@ import { BackgroundTaskManager, BACKGROUND_TOOLS } from './background/index.js'
 import { Mailbox, TaskBoard, TEAM_TOOLS, TEAM_DISPATCH_TOOLS, coordinatorPrompt } from './team/index.js'
 import { MEMORY_TOOLS } from './memory/index.js'
 import type { MemoryStore } from './memory/index.js'
-import type { SessionStore } from './session/index.js'
+import type { SessionStoreLike } from './session/index.js'
 import { PLAN_MODE_TOOLS } from './tools/plan_mode.js'
 import {
   rulesToCanUseTool,
@@ -101,6 +101,13 @@ export interface AgentOptions {
   /** Denylist of tool names, applied after allowedTools. */
   disallowedTools?: string[]
   maxTurns?: number
+  /** Wall-clock budget (ms). At a turn boundary past this, the loop pauses: it
+   *  persists to sessionStore and emits a `paused` system message instead of
+   *  continuing — for spanning serverless function time limits ("survivor"). */
+  maxDurationMs?: number
+  /** Resume + CONTINUE the tool loop on the stored transcript without a new user
+   *  message (pairs with `resume`). Used to continue after a `paused` boundary. */
+  continueRun?: boolean
   cwd?: string
   sessionId?: string
   abortController?: AbortController
@@ -150,7 +157,7 @@ export interface AgentOptions {
   /** This agent's name/label for messaging (default 'coordinator'). */
   agentName?: string
   /** Persist the transcript to this store (keyed by sessionId) for resume. */
-  sessionStore?: SessionStore
+  sessionStore?: SessionStoreLike
   /** Load the stored transcript for sessionId before the first turn. */
   resume?: boolean
   /** Auto-compact the transcript when it approaches the context limit. */
@@ -561,6 +568,8 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
 
   const startedAt = Date.now()
   const sessionUsage = emptyUsage()
+  const maxDurationMs = options.maxDurationMs
+  let paused = false
 
   // Resume: seed the transcript from a prior session before the first turn.
   if (options.resume && options.sessionStore) {
@@ -572,13 +581,18 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
     }
   }
 
-  for await (const userMsg of prompt) {
+  // continueRun: prepend a sentinel turn so the loop continues the stored
+  // transcript with no new user message (used after a `paused` boundary).
+  const promptSrc = options.continueRun ? withContinueSentinel(prompt) : prompt
+
+  for await (const userMsg of promptSrc) {
     if (signal?.aborted) break
 
+    const isContinue = (userMsg as { __continue?: boolean }).__continue === true
     const content = userMsg.message.content
 
     // Slash-command interception: a string user turn beginning with '/'.
-    if (typeof content === 'string' && content.trim().startsWith('/')) {
+    if (!isContinue && typeof content === 'string' && content.trim().startsWith('/')) {
       const outcome = await runSlashCommand(content, {
         history,
         tools: defs.map((d) => ({
@@ -636,7 +650,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
       } else {
         history.push({ role: 'user', content }) // unknown command → normal prompt
       }
-    } else {
+    } else if (!isContinue) {
       history.push({ role: 'user', content })
       const pre = await runHooks('UserPromptSubmit', {
         hook_event_name: 'UserPromptSubmit',
@@ -660,6 +674,11 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
       if (signal?.aborted) break
       if (turns >= maxTurns) {
         hitMaxTurns = true
+        break
+      }
+      // Survivor: pause at this turn boundary if we're past the time budget.
+      if (maxDurationMs != null && Date.now() - startedAt >= maxDurationMs) {
+        paused = true
         break
       }
       turns++
@@ -1070,8 +1089,34 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
         /* persistence is best-effort */
       }
     }
+
+    // Survivor: hit the time budget. The transcript is persisted (above); signal
+    // the client to continue the run in a fresh invocation (resume + continueRun).
+    if (paused) {
+      yield {
+        type: 'system',
+        subtype: 'paused',
+        reason: 'time_budget',
+        session_id: sessionId,
+        uuid: uuid(),
+      } as unknown as SDKMessage
+      break
+    }
   }
 
   // The prompt stream is exhausted — the session is ending.
   await runHooks('SessionEnd', { hook_event_name: 'SessionEnd', reason: 'prompt_input_exit' })
+}
+
+/** Prepend a continue-sentinel turn so the loop continues a resumed transcript. */
+async function* withContinueSentinel(
+  prompt: AsyncIterable<SDKUserMessage>
+): AsyncIterable<SDKUserMessage> {
+  yield {
+    type: 'user',
+    message: { role: 'user', content: '' },
+    parent_tool_use_id: null,
+    __continue: true,
+  } as unknown as SDKUserMessage
+  yield* prompt
 }

@@ -41,12 +41,7 @@ export interface SlashCommandContext {
   /** Current session id. */
   sessionId?: string
   /** Session store, for /sessions, /resume, /rename. */
-  sessionStore?: {
-    list(): Promise<Array<{ sessionId: string; title?: string; updatedAt: number; messageCount: number }>>
-    load(id: string): Promise<ChatMsg[] | null>
-    rename(id: string, title: string): Promise<void>
-    remove(id: string): Promise<void>
-  }
+  sessionStore?: import('../session/types.js').SessionStoreLike
   /** Paths the model has read this session, for /files. */
   readFiles?: Set<string>
   /** Configured sub-agents, for /agents. */
