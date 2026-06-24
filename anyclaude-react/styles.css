@@ -1,0 +1,60 @@
+/* anyclaude-react — optional default theme. Restyle by overriding the CSS
+   variables below, or skip this file entirely and style the .ac-* classes
+   (and data-role attributes) yourself / with Tailwind. */
+.ac-chat {
+  --ac-bg: #0d1117;
+  --ac-fg: #e6edf3;
+  --ac-muted: #8b949e;
+  --ac-border: #232c3d;
+  --ac-accent: #4dd0e1;
+  --ac-user: #5fd75f;
+  --ac-panel: #161b22;
+  --ac-radius: 12px;
+  --ac-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  background: var(--ac-bg);
+  color: var(--ac-fg);
+  font: 15px/1.55 system-ui, sans-serif;
+}
+
+.ac-transcript { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 14px; }
+
+.ac-msg { display: flex; gap: 8px; }
+.ac-msg-user { color: var(--ac-user); }
+.ac-msg-prefix { font-family: var(--ac-mono); opacity: 0.8; }
+.ac-msg-body { min-width: 0; }
+.ac-msg-md .ac-msg-body { color: var(--ac-fg); }
+
+.ac-p { margin: 0 0 8px; }
+.ac-h { margin: 12px 0 6px; line-height: 1.25; }
+.ac-list { margin: 6px 0; padding-left: 22px; }
+.ac-quote { border-left: 3px solid var(--ac-border); margin: 8px 0; padding: 2px 12px; color: var(--ac-muted); }
+.ac-link { color: var(--ac-accent); text-decoration: underline; }
+.ac-code-inline { font-family: var(--ac-mono); background: var(--ac-panel); border: 1px solid var(--ac-border); border-radius: 6px; padding: 1px 5px; font-size: 0.9em; }
+.ac-code-block { font-family: var(--ac-mono); background: var(--ac-panel); border: 1px solid var(--ac-border); border-radius: var(--ac-radius); padding: 12px 14px; overflow-x: auto; margin: 10px 0; }
+
+.ac-tool { border: 1px solid var(--ac-border); border-radius: 10px; background: var(--ac-panel); margin: 2px 0; overflow: hidden; }
+.ac-tool-error { border-color: #b3403a; }
+.ac-tool-head { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; color: var(--ac-accent); padding: 8px 12px; cursor: pointer; font: inherit; text-align: left; }
+.ac-tool-caret { color: var(--ac-muted); }
+.ac-tool-name { font-family: var(--ac-mono); font-weight: 600; }
+.ac-tool-summary { color: var(--ac-muted); font-family: var(--ac-mono); font-size: 0.85em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-tool-body { padding: 0 12px 10px; }
+.ac-tool-args, .ac-tool-result { font-family: var(--ac-mono); font-size: 0.85em; background: var(--ac-bg); border: 1px solid var(--ac-border); border-radius: 8px; padding: 8px 10px; overflow-x: auto; margin: 6px 0 0; }
+.ac-tool-result-error { color: #ff8a80; }
+
+.ac-working { display: flex; align-items: center; gap: 8px; padding: 6px 14px; color: var(--ac-muted); font-family: var(--ac-mono); font-size: 13px; }
+.ac-working-text { background: linear-gradient(90deg, var(--ac-muted) 30%, var(--ac-accent) 50%, var(--ac-muted) 70%); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; color: transparent; animation: ac-shimmer 1.6s linear infinite; }
+.ac-working-spinner { width: 9px; height: 9px; border-radius: 50%; background: var(--ac-accent); animation: ac-pulse 1s ease-in-out infinite; }
+@keyframes ac-shimmer { to { background-position: -200% center; } }
+@keyframes ac-pulse { 0%, 100% { opacity: 0.35; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1); } }
+
+.ac-composer { display: flex; gap: 8px; align-items: flex-end; padding: 12px 14px; border-top: 1px solid var(--ac-border); }
+.ac-composer-input { flex: 1; resize: none; background: var(--ac-panel); color: var(--ac-fg); border: 1px solid var(--ac-border); border-radius: 10px; padding: 10px 12px; font: inherit; min-height: 20px; max-height: 180px; }
+.ac-composer-input:focus { outline: none; border-color: var(--ac-accent); }
+.ac-composer-send { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 10px; background: var(--ac-accent); color: #00121a; border: 0; cursor: pointer; flex: none; }
+.ac-composer-send:disabled { opacity: 0.4; cursor: default; }

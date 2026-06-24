@@ -1,0 +1,22 @@
+{
+  "name": "anyclaude-react",
+  "version": "0.1.0",
+  "description": "React UI kit for anyclaude-sdk — restylable hooks + components (useAgent, Transcript, Composer, AgentChat) with built-in serverless 'survivor' stream-stitching. Build chatbots, agents, research assistants.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./styles.css": "./styles.css"
+  },
+  "files": ["dist", "styles.css"],
+  "sideEffects": ["*.css"],
+  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit", "prepublishOnly": "npm run build" },
+  "keywords": ["anyclaude", "claude", "agent", "react", "ai-chat", "chatbot", "ui", "hooks"],
+  "license": "MIT",
+  "author": "Hans Ade <anye.happiness@swisslinkedu.com>",
+  "repository": { "type": "git", "url": "git+https://github.com/pipilot-dev/anyclaude-sdk.git", "directory": "anyclaude-react" },
+  "peerDependencies": { "react": ">=18", "anyclaude-sdk": ">=0.1.0" },
+  "devDependencies": { "@types/react": "^18.3.0", "react": "^18.3.1", "typescript": "^5.4.0" }
+}
