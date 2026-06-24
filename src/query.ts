@@ -41,6 +41,11 @@ export interface QueryOptions {
   maxDurationMs?: number
   /** Resume + continue the tool loop with no new user message (after a `paused` boundary). */
   continueRun?: boolean
+  /** Tool names the HOST/client executes (e.g. bash on a browser WebContainer). The agent
+   *  emits a `client_tool_request` + pauses; the client runs it and resumes with results. */
+  clientTools?: string[]
+  /** Results for client-tool calls, injected before continuing (with continueRun). */
+  clientToolResults?: Array<{ tool_use_id: string; content: string | import('./types/index.js').ContentBlockParam[]; is_error?: boolean }>
   cwd?: string
   sessionId?: string
   abortController?: AbortController
@@ -134,6 +139,8 @@ export function query(options: QueryOptions): Query {
     maxTurns: options.maxTurns,
     maxDurationMs: options.maxDurationMs,
     continueRun: options.continueRun,
+    clientTools: options.clientTools,
+    clientToolResults: options.clientToolResults,
     cwd: options.cwd,
     sessionId: options.sessionId,
     abortController,

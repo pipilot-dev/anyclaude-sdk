@@ -109,6 +109,12 @@ export interface AgentOptions {
   /** Resume + CONTINUE the tool loop on the stored transcript without a new user
    *  message (pairs with `resume`). Used to continue after a `paused` boundary. */
   continueRun?: boolean
+  /** Tool names executed by the HOST/client, not the server. When the agent calls
+   *  one, the loop emits a `client_tool_request` + pauses; the client runs it and
+   *  resumes (continueRun) with `clientToolResults`. (e.g. bash on a browser WebContainer.) */
+  clientTools?: string[]
+  /** Results for client-tool calls, injected into the transcript before continuing. */
+  clientToolResults?: Array<{ tool_use_id: string; content: string | ContentBlockParam[]; is_error?: boolean }>
   cwd?: string
   sessionId?: string
   abortController?: AbortController
@@ -368,6 +374,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
     ? options.backgroundManager ?? new BackgroundTaskManager()
     : undefined
   const messageQueue = options.messageQueue
+  const clientTools = new Set<string>(options.clientTools ?? [])
 
   // Teammates: a shared Mailbox + TaskBoard (reused from the parent when this
   // is a sub-agent) + team tools + coordinator prompt.
@@ -583,6 +590,8 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
   const sessionUsage = emptyUsage()
   const maxDurationMs = options.maxDurationMs
   let paused = false
+  // Pending client-executed tool calls for the current turn (emitted on pause).
+  let clientRequests: Array<{ tool_use_id: string; name: string; input: Record<string, unknown> }> = []
 
   // Resume: seed the transcript from a prior session before the first turn.
   if (options.resume && options.sessionStore) {
@@ -671,6 +680,29 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
       })
       const extra = pre.map((o) => (o && o.additionalContext) || '').filter(Boolean).join('\n')
       if (extra) history.push({ role: 'user', content: extra })
+    }
+
+    // Continue after a client-tool pause: inject the host-executed results into
+    // the transcript so the (paused) assistant tool_use calls are now resolved.
+    if (isContinue && options.clientToolResults?.length) {
+      const blocks: ContentBlockParam[] = []
+      for (const r of options.clientToolResults) {
+        history.push({
+          role: 'tool',
+          tool_call_id: r.tool_use_id,
+          content: typeof r.content === 'string' ? r.content : JSON.stringify(r.content),
+        })
+        blocks.push({ type: 'tool_result', tool_use_id: r.tool_use_id, content: r.content as never, is_error: r.is_error || undefined })
+      }
+      yield {
+        type: 'user',
+        message: { role: 'user', content: blocks },
+        parent_tool_use_id: null,
+        isSynthetic: true,
+        timestamp: new Date().toISOString(),
+        uuid: uuid(),
+        session_id: sessionId,
+      }
     }
 
     let turns = 0
@@ -842,11 +874,18 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
 
       // Execute tool calls (permission gate + hooks around each).
       const toolResultBlocks: ContentBlockParam[] = []
+      clientRequests = []
       const turnMedia: Array<ImageBlock | import('./types/index.js').DocumentBlock> = []
       for (const call of calls) {
         if (signal?.aborted) break
         const name = call.function.name
         let input = safeParse(call.function.arguments)
+        // Client-executed tool: don't run it here — record it; we pause after this
+        // turn's server tools and let the host execute + resume with the result.
+        if (clientTools.has(name)) {
+          clientRequests.push({ tool_use_id: call.id, name, input })
+          continue
+        }
         const tool = byName.get(name)
 
         let content: string | ContentBlockParam[] = ''
@@ -1027,14 +1066,23 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
         })
       }
 
-      yield {
-        type: 'user',
-        message: { role: 'user', content: toolResultBlocks },
-        parent_tool_use_id: null,
-        isSynthetic: true,
-        timestamp: new Date().toISOString(),
-        uuid: uuid(),
-        session_id: sessionId,
+      if (toolResultBlocks.length) {
+        yield {
+          type: 'user',
+          message: { role: 'user', content: toolResultBlocks },
+          parent_tool_use_id: null,
+          isSynthetic: true,
+          timestamp: new Date().toISOString(),
+          uuid: uuid(),
+          session_id: sessionId,
+        }
+      }
+
+      // Client-executed tools were requested this turn → pause; the host runs
+      // them and resumes (continueRun + clientToolResults).
+      if (clientRequests.length) {
+        paused = true
+        break
       }
     }
 
@@ -1103,13 +1151,23 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
       }
     }
 
-    // Survivor: hit the time budget. The transcript is persisted (above); signal
-    // the client to continue the run in a fresh invocation (resume + continueRun).
+    // Survivor / client-tools: paused at a boundary. Transcript persisted above.
+    // Emit any client-tool requests for the host to execute, then signal the
+    // client to continue in a fresh invocation (resume + continueRun [+ results]).
     if (paused) {
+      for (const req of clientRequests) {
+        yield {
+          type: 'system',
+          subtype: 'client_tool_request',
+          request: req,
+          session_id: sessionId,
+          uuid: uuid(),
+        } as unknown as SDKMessage
+      }
       yield {
         type: 'system',
         subtype: 'paused',
-        reason: 'time_budget',
+        reason: clientRequests.length ? 'client_tool' : 'time_budget',
         session_id: sessionId,
         uuid: uuid(),
       } as unknown as SDKMessage
