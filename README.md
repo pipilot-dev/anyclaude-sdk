@@ -1,4 +1,4 @@
-# browser-claude-sdk
+# anyclaude-sdk
 
 Claude Code agent capabilities — tools, the tool loop, multi-turn conversations —
 running **entirely in the browser** via [WebContainer](https://webcontainers.io),
@@ -12,7 +12,7 @@ SDK can iterate our output unchanged.
 ## Install
 
 ```bash
-npm install @browser-claude-sdk/core @webcontainer/api
+npm install anyclaude-sdk @webcontainer/api
 ```
 
 `@webcontainer/api` is an optional peer dependency — only needed if you use
@@ -27,7 +27,7 @@ import {
   WebContainerWorkspace,
   createOpenAIClient,
   ALL_CLAUDE_CODE_TOOLS,
-} from '@browser-claude-sdk/core'
+} from 'anyclaude-sdk'
 
 // 1. Boot a WebContainer and wrap it as a workspace.
 const wc = await WebContainer.boot()
@@ -58,7 +58,7 @@ Connect external MCP servers or define in-process tools. Because browsers block
 direct cross-origin MCP fetches (CORS), pass a `mcpProxy` for remote servers:
 
 ```typescript
-import { createSdkMcpServer, tool } from '@browser-claude-sdk/core'
+import { createSdkMcpServer, tool } from 'anyclaude-sdk'
 
 const calc = createSdkMcpServer({
   name: 'calc',
@@ -85,7 +85,7 @@ Remote tools are exposed as `mcp__<server>__<tool>`.
 Three transport clients, all implementing the same `LLMClient` interface:
 
 ```typescript
-import { createOpenAIClient, createAnthropicClient, createResponsesClient } from '@browser-claude-sdk/core'
+import { createOpenAIClient, createAnthropicClient, createResponsesClient } from 'anyclaude-sdk'
 
 // OpenAI-compatible Chat Completions (OpenAI, Groq, Together, OpenRouter, xAI, Kilo, local…)
 const a = createOpenAIClient({ apiKey, baseUrl: 'https://api.x.ai/v1', model: 'grok-build-0.1' })
@@ -105,7 +105,7 @@ and include a fallback parser for models that emit tool calls as inline text.
 Use a `PromptStream` to push user turns over time:
 
 ```typescript
-import { query, PromptStream } from '@browser-claude-sdk/core'
+import { query, PromptStream } from 'anyclaude-sdk'
 
 const prompts = new PromptStream()
 const session = query({ prompt: prompts, workspace, llm, model: 'gpt-4o' })
@@ -155,7 +155,7 @@ query({ prompt, workspace, llm, limits: { maxTokens: 25000, maxImageBytes: 3_750
 Pass a subset, or your own `Tool[]`, via `tools:`:
 
 ```typescript
-import { readFile, writeFile, editFile } from '@browser-claude-sdk/core'
+import { readFile, writeFile, editFile } from 'anyclaude-sdk'
 
 query({ prompt, workspace, llm, tools: [readFile, writeFile, editFile] })
 ```
@@ -167,7 +167,7 @@ A user turn beginning with `/` is intercepted. Built-ins: `/help`, `/clear`,
 `/model`. Define your own prompt-template commands:
 
 ```typescript
-import { query, promptCommand } from '@browser-claude-sdk/core'
+import { query, promptCommand } from 'anyclaude-sdk'
 
 query({
   prompt: promptStream, workspace, llm,
@@ -199,7 +199,7 @@ Adapters wrap each provider's client structurally (no hard dependency on their
 SDKs — install only the one you use):
 
 ```typescript
-import { E2BSandbox, VercelSandbox, DaytonaSandbox, CloudflareSandbox } from '@browser-claude-sdk/core'
+import { E2BSandbox, VercelSandbox, DaytonaSandbox, CloudflareSandbox } from 'anyclaude-sdk'
 
 // e.g. E2B
 import { Sandbox } from 'e2b'
@@ -219,7 +219,7 @@ Run the agent directly against the host machine's filesystem and shell — like
 Claude Code — with automatic platform detection (Windows / macOS / Linux):
 
 ```typescript
-import { LocalSandbox, createAnthropicClient, query } from '@browser-claude-sdk/core'
+import { LocalSandbox, createAnthropicClient, query } from 'anyclaude-sdk'
 
 const workspace = new LocalSandbox({ cwd: '/path/to/project' }) // defaults to process.cwd()
 const llm = createAnthropicClient({ baseUrl, model: 'claude-sonnet-4-6', apiKey })
@@ -241,7 +241,7 @@ standard Linux tree. `DexieFileSystem` (IndexedDB) is the recommended default
 ```typescript
 import {
   DexieFileSystem, OpfsFileSystem, seedLinuxTree, composeWorkspace, NoopCommandExecutor,
-} from '@browser-claude-sdk/core'
+} from 'anyclaude-sdk'
 
 const fs = new DexieFileSystem('my-project-fs')   // or: new OpfsFileSystem()
 await seedLinuxTree(fs)                            // /bin /etc /home/user /tmp /usr …
@@ -260,7 +260,7 @@ feature-detect.
 A `MemoryFileSystem` also ships for tests:
 
 ```typescript
-import { MemoryFileSystem, NoopCommandExecutor, composeWorkspace } from '@browser-claude-sdk/core'
+import { MemoryFileSystem, NoopCommandExecutor, composeWorkspace } from 'anyclaude-sdk'
 
 const fs = new MemoryFileSystem()
 await fs.writeFile('/app/index.ts', 'export const x = 1')
@@ -282,7 +282,7 @@ const workspace = composeWorkspace(fs, new NoopCommandExecutor())
 
 ## Differences from the official SDK
 
-| Feature | Official SDK | browser-claude-sdk |
+| Feature | Official SDK | anyclaude-sdk |
 |---------|-------------|--------------------|
 | Auth | OAuth token | None required |
 | Backend | claude.ai API | Any OpenAI/Anthropic endpoint |

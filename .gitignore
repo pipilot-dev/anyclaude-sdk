@@ -20,3 +20,6 @@ MEMORY.md
 
 # editor/session config
 .claude/
+
+# npm auth (created transiently at publish time)
+.npmrc
