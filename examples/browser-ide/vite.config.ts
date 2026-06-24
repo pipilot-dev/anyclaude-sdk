@@ -7,6 +7,8 @@ const coi = {
   'Cross-Origin-Embedder-Policy': 'require-corp',
 }
 export default defineConfig({
+  // Relative base so the build works when served from a subpath (e.g. /demo/).
+  base: './',
   plugins: [react()],
   server: { headers: coi },
   preview: { headers: coi },
