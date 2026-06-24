@@ -81,8 +81,8 @@ export async function POST(req: Request) {
       </table>
 
       <div class="card" style="border-left:3px solid var(--accent)">
-        <h4><i data-lucide="life-buoy"></i> The "survivor" — span the cap <span class="pill">0.2.0 · coming soon</span></h4>
-        <p>For runs longer than your function's limit, the SDK will checkpoint at a <b>turn boundary</b> just before the deadline (<code>maxDurationMs</code>), persist to a pluggable <b>SessionStore</b> (Supabase / Neon / Vercel KV / Upstash Redis), and emit a <code>paused</code> event. A framework-agnostic client interceptor then fires a continuation request (<code>resume</code> + same <code>sessionId</code>) and stitches the streams into one — so a 30s Appwrite function can run an unlimited-length agent, transparently.</p>
+        <h4><i data-lucide="life-buoy"></i> The "survivor" — span the cap <span class="pill">shipped in 0.2.0</span></h4>
+        <p>For runs longer than your function's limit, the SDK checkpoints at a <b>turn boundary</b> just before the deadline (<code>query({ maxDurationMs })</code>), persists to a pluggable <b>SessionStore</b> (Supabase / Neon / Vercel KV / Upstash Redis / IndexedDB / memory), and emits a <code>paused</code> message. The continuation runs with <code>query({ resume: true, continueRun: true })</code> and the same <code>sessionId</code>. The <code>anyclaude-react</code> client (<code>createAgentClient</code> / <code>createEndpointClient</code>) <b>auto-stitches</b> the streams into one — so a 30s Appwrite function runs an unlimited-length agent, transparently.</p>
       </div>
     </section>
 
