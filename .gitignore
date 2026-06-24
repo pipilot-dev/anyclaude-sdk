@@ -23,3 +23,9 @@ MEMORY.md
 
 # npm auth (created transiently at publish time)
 .npmrc
+
+# puter deploy helper (local only, may hold token at runtime via env)
+/puter-deploy
+
+# playwright MCP artifacts
+.playwright-mcp/
