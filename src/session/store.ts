@@ -6,7 +6,7 @@
 // loads even when Dexie isn't installed (the error surfaces only on first use).
 
 import type { ChatMsg } from '../types/index.js'
-import type { SessionMeta, SessionStoreOptions, StoredSession } from './types.js'
+import type { SessionMeta, SessionStoreOptions, StoredSession, SessionStoreLike } from './types.js'
 
 // Minimal structural view of the Dexie surface we use (db typed loosely so we
 // don't require @types for an optional dependency).
@@ -35,7 +35,9 @@ type DexieDb = {
   transcripts: Table<TranscriptRow>
 }
 
-export class SessionStore {
+// The built-in IndexedDB (Dexie) session store. `implements SessionStoreLike`
+// guarantees it stays compatible with the pluggable interface the agent expects.
+export class SessionStore implements SessionStoreLike {
   private readonly dbName: string
   private db: DexieDb | null = null
   private opening: Promise<DexieDb> | null = null

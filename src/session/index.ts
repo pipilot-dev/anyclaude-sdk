@@ -9,6 +9,7 @@ export type { SessionMeta, StoredSession, SessionStoreOptions, SessionStoreLike 
 
 // Pluggable backends for the survivor / serverless persistence (structural
 // clients — the DB packages stay optional).
+export { MemorySessionStore } from './adapters/memory.js'
 export { KVSessionStore, type KVClientLike } from './adapters/kv.js'
 export { RedisSessionStore, type RedisClientLike } from './adapters/redis.js'
 export { PostgresSessionStore, POSTGRES_SCHEMA, type PgRunnerLike } from './adapters/postgres.js'
