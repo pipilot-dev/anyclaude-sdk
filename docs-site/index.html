@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>anyclaude-sdk — Claude Code agents for any LLM, in the browser</title>
+  <meta name="description" content="Claude Code agent capabilities (tools, tool loop, MCP, sub-agents, sessions) for any OpenAI/Anthropic-compatible LLM — in the browser, Node, and Bun. No backend required." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.1.0 · MIT</div>
+    <nav class="nav">
+      <a href="#top">Overview</a>
+      <a href="#why">Why anyclaude</a>
+      <div class="grp">Get started</div>
+      <a href="#quickstart">Quick start</a>
+      <a href="#concepts">Core concepts</a>
+      <div class="grp">Build</div>
+      <a href="#custom-tools">Custom tools</a>
+      <a href="#tool-selection">Tool selection</a>
+      <a href="#queue">Message queue</a>
+      <a href="#more">More capabilities</a>
+      <div class="grp">Ship</div>
+      <a href="#deploy">Deploy anywhere</a>
+    </nav>
+  </aside>
+
+  <main>
+    <!-- HERO -->
+    <section id="top" class="hero">
+      <span class="pill">● Claude Code, unbundled</span>
+      <h1>Claude Code agents,<br />for any LLM, anywhere.</h1>
+      <p class="tag">A standalone, headless agent engine — tools, the tool loop, MCP, sub-agents, sessions — that runs against <b>any OpenAI- or Anthropic-compatible endpoint</b>, in the <b>browser</b> (WebContainer), <b>Node</b>, and <b>Bun</b>. No backend, no OAuth, no native binaries.</p>
+      <div class="btns">
+        <a class="btn primary" href="https://www.npmjs.com/package/anyclaude-sdk">↓ npm: anyclaude-sdk</a>
+        <a class="btn ghost" href="https://github.com/pipilot-dev/anyclaude-sdk">★ GitHub</a>
+      </div>
+      <div class="code"><pre><code class="language-bash">npm install anyclaude-sdk</code></pre></div>
+    </section>
+
+    <!-- WHY -->
+    <section id="why">
+      <h2>Why anyclaude</h2>
+      <p class="lead">The same <code>query()</code> async-generator interface and <code>SDKMessage</code> envelope as the official Claude Agent SDK — but provider-agnostic and runtime-agnostic.</p>
+      <div class="grid">
+        <div class="card"><div class="ic">🧠</div><h4>Headless engine</h4><p>Pure agent logic — bring your own UI (chatbot, research assistant, terminal agent). Zero framework lock-in.</p></div>
+        <div class="card"><div class="ic">🌐</div><h4>Browser, Node, Bun</h4><p>Runs in a WebContainer tab, a Node server, or a Bun process — the exact same code.</p></div>
+        <div class="card"><div class="ic">🔌</div><h4>Any LLM endpoint</h4><p>OpenAI, Anthropic, xAI, Groq, Together, OpenRouter, Ollama, or a local server. Three transport clients, one interface.</p></div>
+        <div class="card"><div class="ic">🧰</div><h4>Full toolset</h4><p>Files (text/image/PDF/notebook), shell, glob/grep, web fetch &amp; search, todos — plus your own custom tools.</p></div>
+        <div class="card"><div class="ic">🏖️</div><h4>Pluggable sandboxes</h4><p>WebContainer, E2B, Vercel, Daytona, Cloudflare, or the real local OS. A sandbox is just FS + exec.</p></div>
+        <div class="card"><div class="ic">🚫</div><h4>No backend required</h4><p>Drive an agent straight from the browser against your LLM key, or run it serverless — your choice.</p></div>
+      </div>
+    </section>
+
+    <!-- QUICK START -->
+    <section id="quickstart">
+      <h2>Quick start</h2>
+      <p class="lead">Pick a runtime. Every example is the same three steps: a <b>workspace</b> (files + shell), an <b>LLM client</b>, and <code>query()</code>.</p>
+      <div class="tabgroup">
+        <div class="tabs">
+          <button class="tab active">Browser</button>
+          <button class="tab">Node</button>
+          <button class="tab">Bun</button>
+        </div>
+        <div class="tabpanes">
+          <div class="pane active">
+            <div class="code"><pre><code class="language-typescript">import { WebContainer } from '@webcontainer/api'
+import { query, WebContainerWorkspace, createOpenAIClient } from 'anyclaude-sdk'
+
+const wc = await WebContainer.boot()
+const workspace = new WebContainerWorkspace(wc)
+
+const llm = createOpenAIClient({
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+  baseUrl: 'https://api.openai.com/v1', // or xAI, Groq, OpenRouter, local…
+  model: 'gpt-4o',
+})
+
+for await (const msg of query({ prompt: 'List the files and summarize the project', workspace, llm })) {
+  if (msg.type === 'assistant')
+    for (const b of msg.message.content) if (b.type === 'text') console.log(b.text)
+  else if (msg.type === 'result' &amp;&amp; msg.subtype === 'success') console.log('Done:', msg.result)
+}</code></pre></div>
+          </div>
+          <div class="pane">
+            <div class="code"><pre><code class="language-typescript">import { query, LocalSandbox, createAnthropicClient } from 'anyclaude-sdk'
+
+// Real OS: agent works against your actual filesystem + shell, like Claude Code.
+const workspace = new LocalSandbox({ cwd: process.cwd() })
+const llm = createAnthropicClient({ apiKey: process.env.ANTHROPIC_API_KEY, model: 'claude-sonnet-4-6' })
+
+for await (const msg of query({ prompt: 'add a --version flag and run the tests', workspace, llm })) {
+  if (msg.type === 'assistant')
+    for (const b of msg.message.content) if (b.type === 'text') process.stdout.write(b.text)
+}</code></pre></div>
+          </div>
+          <div class="pane">
+            <div class="code"><pre><code class="language-typescript">import { query, MemoryFileSystem, NoopCommandExecutor, composeWorkspace, createOpenAIClient } from 'anyclaude-sdk'
+
+// In-memory FS, no shell — great for serverless / Bun functions.
+const fs = new MemoryFileSystem()
+const workspace = composeWorkspace(fs, new NoopCommandExecutor(), '/home/user')
+const llm = createOpenAIClient({ apiKey: process.env.LLM_KEY, baseUrl: 'https://api.x.ai/v1', model: 'grok-build-0.1' })
+
+for await (const msg of query({ prompt: 'Write a haiku to /home/user/poem.txt', workspace, llm, model: 'grok-build-0.1' })) {
+  if (msg.type === 'result') console.log(msg.subtype)
+}</code></pre></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CORE CONCEPTS -->
+    <section id="concepts">
+      <h2>Core concepts</h2>
+      <p class="lead"><code>query()</code> returns an <code>AsyncGenerator&lt;SDKMessage&gt;</code>. You iterate the stream and render each message — the same envelope as the official SDK.</p>
+      <h3>The message stream</h3>
+      <div class="code"><pre><code class="language-typescript">for await (const msg of query({ prompt, workspace, llm, includePartialMessages: true })) {
+  switch (msg.type) {
+    case 'system':       break // init (tools, model, cwd), compact_boundary, local_command_output
+    case 'stream_event': break // token deltas (when includePartialMessages: true)
+    case 'assistant':    break // a full assistant turn: text + tool_use blocks
+    case 'user':         break // synthetic tool_result turns (msg.isSynthetic)
+    case 'result':       break // final: subtype 'success' | 'error', usage, total_cost_usd
+  }
+}</code></pre></div>
+      <div class="grid">
+        <div class="card"><h4>Tools</h4><p>A <code>Tool</code> is an OpenAI function schema + a <code>run(input, ctx)</code>. Ships with the full Claude Code toolset; add your own.</p></div>
+        <div class="card"><h4>Sandboxes</h4><p>WebContainer · LocalSandbox · E2B · Vercel · Daytona · Cloudflare. All implement one <code>Sandbox</code> = FileSystem + CommandExecutor.</p></div>
+        <div class="card"><h4>Filesystems</h4><p><code>DexieFileSystem</code> (IndexedDB) · <code>OpfsFileSystem</code> · <code>MemoryFileSystem</code>. Seed a Linux tree with <code>seedLinuxTree()</code>.</p></div>
+        <div class="card"><h4>LLM clients</h4><p><code>createOpenAIClient</code> · <code>createAnthropicClient</code> · <code>createResponsesClient</code> — all normalize tools, streaming, and usage.</p></div>
+      </div>
+    </section>
+
+    <!-- CUSTOM TOOLS -->
+    <section id="custom-tools">
+      <h2>Custom tools</h2>
+      <p class="lead">Define a tool with <code>defineTool()</code> — a name, description, JSON-Schema params, and a <code>run()</code> execution method that can do anything async.</p>
+      <div class="code"><pre><code class="language-typescript">import { query, defineTool } from 'anyclaude-sdk'
+
+const weather = defineTool({
+  name: 'get_weather',
+  description: 'Current weather for a city',
+  parameters: { properties: { city: { type: 'string' } }, required: ['city'] },
+  run: async ({ city }, ctx) => ({ content: await fetchWeather(String(city)) }),
+})
+
+// extraTools is ADDITIVE — your tools alongside the builtins (read/write/bash/grep…)
+query({ prompt, workspace, llm, extraTools: [weather] })
+
+// tools REPLACES the builtins entirely — use when you want a locked-down set
+query({ prompt, workspace, llm, tools: [weather] })</code></pre></div>
+      <div class="note"><b><code>extraTools</code> adds; <code>tools</code> replaces.</b> Reach for <code>extraTools</code> in almost every case so you keep the file/shell/search builtins.</div>
+    </section>
+
+    <!-- TOOL SELECTION -->
+    <section id="tool-selection">
+      <h2>Tool selection &amp; disabling</h2>
+      <p class="lead">Narrow or disable any tool — builtin or custom — with allow/deny lists (also readable from <code>.claude/settings.json</code>).</p>
+      <div class="code"><pre><code class="language-typescript">// Whitelist: ONLY these tools are available
+query({ prompt, workspace, llm, allowedTools: ['read_file', 'grep', 'get_weather'] })
+
+// Denylist: everything except these (applied after allowedTools)
+query({ prompt, workspace, llm, disallowedTools: ['bash', 'delete_file'] })</code></pre></div>
+    </section>
+
+    <!-- MESSAGE QUEUE -->
+    <section id="queue">
+      <h2>Message queue — type while it works</h2>
+      <p class="lead">Interject follow-up messages into a <b>live</b> agent run. Each queued message is delivered <b>one per turn boundary</b> — injected as a user turn before the next model call, and a run that would otherwise end keeps going while the queue is non-empty.</p>
+      <div class="code"><pre><code class="language-typescript">import { query, MessageQueue } from 'anyclaude-sdk'
+
+const queue = new MessageQueue()
+const run = query({ prompt: 'Refactor the auth module', workspace, llm, messageQueue: queue })
+
+// …while it's still streaming/running tools, the user types more:
+queue.push('also add rate limiting')
+queue.push('and update the README')   // delivered one at a time, at turn boundaries
+
+for await (const msg of run) { /* render… */ }</code></pre></div>
+      <div class="note">Perfect for chat UIs: the user never has to wait for the agent to finish before lining up the next instruction.</div>
+    </section>
+
+    <!-- MORE -->
+    <section id="more">
+      <h2>More capabilities</h2>
+      <p class="lead">Everything you expect from Claude Code, as composable options.</p>
+      <div class="grid">
+        <div class="card"><h4>Sessions &amp; resume</h4><p>Persist the transcript via a <code>sessionStore</code> and <code>resume</code> a prior session by id.</p></div>
+        <div class="card"><h4>MCP servers</h4><p>In-process (<code>createSdkMcpServer</code>) or remote HTTP/SSE, with a CORS <code>mcpProxy</code> for the browser. Tools surface as <code>mcp__server__tool</code>.</p></div>
+        <div class="card"><h4>Sub-agents</h4><p>The <code>task</code> tool spawns isolated sub-agents; enable with <code>agents: {}</code>. Custom agent types supported.</p></div>
+        <div class="card"><h4>Teammates / coordinator</h4><p><code>team: true</code> adds a shared mailbox + task board: <code>send_message</code>, <code>task_create</code>/<code>update</code>, <code>dispatch_tasks</code>.</p></div>
+        <div class="card"><h4>Permissions &amp; plan mode</h4><p>allow/deny/ask rules, a <code>canUseTool</code> gate, and a plan mode that blocks mutations until you approve.</p></div>
+        <div class="card"><h4>Slash commands</h4><p><code>/help</code>, <code>/compact</code>, <code>/cost</code>, <code>/tools</code>, <code>/model</code> + your own <code>promptCommand</code>s.</p></div>
+        <div class="card"><h4>Background tasks</h4><p><code>background: true</code> → run sub-agents off the critical path; poll with <code>task_list</code>/<code>task_output</code>/<code>task_stop</code>.</p></div>
+        <div class="card"><h4>Cost accounting</h4><p>Per-run <code>usage</code> + <code>total_cost_usd</code> on the <code>result</code> message, with prefix-cache awareness.</p></div>
+      </div>
+    </section>
+
+    <!-- DEPLOY -->
+    <section id="deploy">
+      <h2>Deploy anywhere</h2>
+      <p class="lead">Because the engine is headless, you choose where the agent loop runs. Two recipes cover everything.</p>
+
+      <h3>Recipe 1 — Serverless function (browser + a function backend)</h3>
+      <p>The browser drives the UI; a serverless function runs <code>query()</code> and streams back. Great on free tiers — but the function's time limit caps the run.</p>
+      <table>
+        <thead><tr><th>Platform (free tier)</th><th>Function limit</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Vercel Hobby</td><td>~300s</td><td>Covers most agent runs in a single invocation</td></tr>
+          <tr><td>Appwrite</td><td>30s</td><td>Tight — continuation recommended</td></tr>
+          <tr><td>Netlify</td><td>~10s (sync) / 15&nbsp;min (background)</td><td>Use background functions for long runs</td></tr>
+          <tr><td>Cloudflare Workers</td><td>CPU-time (I/O is "free")</td><td>LLM-bound runs rarely hit it; or use Durable Objects / Workflows</td></tr>
+          <tr><td>AWS Lambda</td><td>15&nbsp;min</td><td>Effectively unbounded for most agents</td></tr>
+        </tbody>
+      </table>
+      <div class="note warn"><b>Survivor continuation <span class="soon">coming in 0.2.0</span></b> — when a run approaches the function's limit, the agent checkpoints to a pluggable <code>SessionStore</code> (Supabase · Neon · Vercel KV · Upstash Redis) at a turn boundary, and a tiny framework-agnostic client transparently re-requests to continue in a fresh invocation. The user sees one continuous stream; a 30s function runs an unbounded agent. Default budget: ~10s under your platform's configured timeout, fully configurable.</div>
+
+      <h3>Recipe 2 — Sandbox-as-runtime (no time limit)</h3>
+      <p>Run <code>query()</code> <b>inside</b> a long-lived sandbox (E2B / Vercel Sandbox / Daytona) and stream to the browser. The sandbox is the compute, so there's no per-request cap — the agent runs as long as the sandbox is alive.</p>
+      <div class="code"><pre><code class="language-typescript">import { Sandbox } from 'e2b'
+import { query, E2BSandbox, createAnthropicClient } from 'anyclaude-sdk'
+
+const sbx = await Sandbox.create()                 // long-lived microVM
+const workspace = new E2BSandbox(sbx)
+const llm = createAnthropicClient({ apiKey, model: 'claude-sonnet-4-6' })
+
+// Runs to completion regardless of any function timeout.
+for await (const msg of query({ prompt, workspace, llm })) { /* stream to the browser */ }</code></pre></div>
+    </section>
+
+    <footer>
+      <div>Built by <b>Hans Ade</b> · MIT License</div>
+      <div>
+        <a href="https://www.npmjs.com/package/anyclaude-sdk">npm</a> ·
+        <a href="https://github.com/pipilot-dev/anyclaude-sdk">GitHub</a> ·
+        <a href="https://github.com/pipilot-dev/anyclaude-sdk/blob/main/LICENSE">License</a>
+      </div>
+    </footer>
+  </main>
+</div>
+</body>
+</html>
