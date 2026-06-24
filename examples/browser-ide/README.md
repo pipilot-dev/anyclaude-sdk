@@ -34,9 +34,3 @@ vercel deploy    # vercel.json applies the COOP/COEP headers
 
 Optional `.env` (defaults to the keyless `the3rdacademy` endpoint): `VITE_LLM_BASE`,
 `VITE_LLM_MODEL`, `VITE_LLM_KEY`.
-
-## Note
-
-This example currently links `anyclaude-react` via `file:../../anyclaude-react`
-(it uses the newest IDE components). Once `anyclaude-react@0.2.0` is published,
-change that dependency to `"anyclaude-react": "^0.2.0"`.
