@@ -277,6 +277,28 @@ await fs.writeFile('/app/index.ts', 'export const x = 1')
 const workspace = composeWorkspace(fs, new NoopCommandExecutor())
 ```
 
+## Skills (programmatic)
+
+Declare reusable prompt-skills inline — each becomes a `/name` slash command and is invokable by the agent through the `skill` tool. `$ARGUMENTS` is substituted at call time:
+
+```ts
+import { query, defineSkill } from 'anyclaude-sdk'
+
+query({
+  prompt, workspace, llm,
+  skills: [
+    defineSkill({
+      name: 'changelog',
+      description: 'Summarize git changes into a changelog entry',
+      instructions: 'Write a concise changelog entry for: $ARGUMENTS',
+      argumentHint: '<since>',
+    }),
+  ],
+})
+```
+
+You can also pass plain `Skill` objects, or `skills: true` to load `.claude/skills/*.md` from the workspace.
+
 ## Serverless & the "survivor"
 
 Run `query()` in a serverless function and stream `SDKMessage`s to the browser. For runs longer than the platform's time cap, checkpoint at a turn boundary and continue transparently in a fresh invocation:

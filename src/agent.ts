@@ -40,7 +40,7 @@ import { ALL_CLAUDE_CODE_TOOLS, toolByName, toolDefs } from './tools/index.js'
 import { task as taskTool } from './tools/task.js'
 import { askUserQuestion } from './tools/ask_user.js'
 import { loadMcpServers, type McpServers, type McpProxy } from './mcp/index.js'
-import { runSlashCommand } from './commands/index.js'
+import { runSlashCommand, BUILTIN_COMMANDS } from './commands/index.js'
 import type { SlashCommand } from './commands/index.js'
 import { BackgroundTaskManager, BACKGROUND_TOOLS } from './background/index.js'
 import { Mailbox, TaskBoard, TEAM_TOOLS, TEAM_DISPATCH_TOOLS, coordinatorPrompt } from './team/index.js'
@@ -571,9 +571,9 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
     mcp_servers: mcpStatuses,
     model: model ?? 'unknown',
     permissionMode,
-    slash_commands: [],
+    slash_commands: [...new Set([...BUILTIN_COMMANDS, ...allCommands].map((c) => c.name.replace(/^\//, '')))],
     output_style: 'default',
-    skills: [],
+    skills: skills.map((s) => s.name),
     agents: agents ? Object.keys(agents) : undefined,
     uuid: uuid(),
     session_id: sessionId,
