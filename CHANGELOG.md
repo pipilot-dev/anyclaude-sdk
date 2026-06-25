@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.4.2
+- Added browser-safe subpath exports `anyclaude-sdk/session` and `anyclaude-sdk/memory` so the IndexedDB `SessionStore` (and memory store) can be imported in browser bundles without pulling in `sandbox/local` (Node builtins) or `background/worker` (comlink). Use these subpaths in front-end code.
+
 ### 0.4.1
 - Fixed the `bash` tool failing with `Error executing bash: [object Object]` on a
   fresh WebContainer: `WebContainerWorkspace.exec` now ensures the working

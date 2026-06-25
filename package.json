@@ -1,6 +1,6 @@
 {
   "name": "anyclaude-sdk",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Standalone, browser-compatible SDK providing Claude Code agent capabilities (tools, tool loop, multi-turn, MCP, sub-agents, sessions) against any OpenAI/Anthropic-compatible LLM endpoint. Runs in the browser (WebContainer), Node, and Bun — no backend required.",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,6 +14,8 @@
     "./fs": { "types": "./dist/fs/index.d.ts", "import": "./dist/fs/index.js" },
     "./llm": { "types": "./dist/llm/index.d.ts", "import": "./dist/llm/index.js" },
     "./tools": { "types": "./dist/tools/index.d.ts", "import": "./dist/tools/index.js" },
+    "./session": { "types": "./dist/session/index.d.ts", "import": "./dist/session/index.js" },
+    "./memory": { "types": "./dist/memory/index.d.ts", "import": "./dist/memory/index.js" },
     "./package.json": "./package.json"
   },
   "sideEffects": false,
