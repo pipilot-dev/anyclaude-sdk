@@ -1,7 +1,22 @@
 <!doctype html>
 <html lang="en">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>anyclaude — browser IDE</title><script src="./coi-serviceworker.js"></script>  <script type="module" crossorigin src="./assets/index-UYz5E0EU.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-Dmo3bX-l.css">
-</head>
+  <head>
+    <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>anyclaude — browser IDE</title>
+    <script src="./coi-serviceworker.js"></script>
+    <script>
+      // WebContainer needs cross-origin isolation. coi-serviceworker supplies the
+      // headers, but they only take effect on a navigation that passes through the
+      // SW — so on the first visit, reload once (after the SW is ready) to gain it.
+      (function () {
+        if (window.crossOriginIsolated) { sessionStorage.removeItem('coiReloaded'); return }
+        if (!navigator.serviceWorker || sessionStorage.getItem('coiReloaded')) return
+        sessionStorage.setItem('coiReloaded', '1')
+        navigator.serviceWorker.ready.then(function () { window.location.reload() })
+      })()
+    </script>
+    <script type="module" crossorigin src="./assets/index-CkNUciCY.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Dmo3bX-l.css">
+  </head>
   <body><div id="root"></div></body>
 </html>

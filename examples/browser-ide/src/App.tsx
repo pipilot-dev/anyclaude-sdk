@@ -31,6 +31,7 @@ const bootWC = () => (bootPromise ??= WebContainer.boot())
 export function App() {
   const [wc, setWc] = useState<WebContainer | null>(null)
   const [workspace, setWorkspace] = useState<WebContainerWorkspace | null>(null)
+  const [bootError, setBootError] = useState<string | null>(null)
   const [openPath, setOpenPath] = useState<string | null>(null)
   const [content, setContent] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
@@ -39,11 +40,19 @@ export function App() {
   // Boot WebContainer once.
   useEffect(() => {
     let alive = true
-    bootWC().then((c) => {
-      if (!alive) return
-      setWc(c)
-      setWorkspace(new WebContainerWorkspace(c, CWD))
-    })
+    bootWC()
+      .then((c) => {
+        if (!alive) return
+        setWc(c)
+        setWorkspace(new WebContainerWorkspace(c, CWD))
+      })
+      .catch((e) => {
+        if (!alive) return
+        setBootError(
+          (e instanceof Error ? e.message : String(e)) +
+            (self.crossOriginIsolated ? '' : ' — page is not cross-origin isolated; try a hard refresh.')
+        )
+      })
     return () => {
       alive = false
     }
@@ -110,6 +119,9 @@ export function App() {
     [wc]
   )
 
+  if (bootError) {
+    return <div className="boot">WebContainer failed to start: {bootError}</div>
+  }
   if (!wc || !workspace || !run) {
     return <div className="boot">Booting WebContainer…</div>
   }
