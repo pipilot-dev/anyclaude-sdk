@@ -1,0 +1,27 @@
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { background: #0b0e14; color: #cbd5e1; font: 14px/1.5 system-ui, sans-serif; }
+
+.app { display: flex; flex-direction: column; height: 100vh; }
+.bar { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-bottom: 1px solid #1e2633; }
+.brand { font-weight: 600; color: #4dd0e1; }
+.sub { color: #7e8a9a; font-size: 12.5px; }
+.sub code, .hint code { color: #aeb6c2; }
+.cfg-btn { margin-left: auto; background: #18202c; color: #cbd5e1; border: 1px solid #2a3340; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+
+.settings { padding: 12px 14px; border-bottom: 1px solid #1e2633; background: #0e131b; }
+.settings .hint { margin: 0 0 10px; color: #8a94a3; font-size: 12.5px; }
+.fields { display: flex; gap: 12px; flex-wrap: wrap; }
+.fields label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #8a94a3; flex: 1; min-width: 200px; }
+.fields input { background: #0b0e14; border: 1px solid #2a3340; border-radius: 8px; padding: 8px 10px; color: #e6edf3; font: inherit; }
+
+.body { display: flex; flex: 1; min-height: 0; }
+.files { width: 240px; border-right: 1px solid #1e2633; overflow: auto; }
+.center { flex: 1; display: flex; flex-direction: column; min-width: 0; border-right: 1px solid #1e2633; }
+.editor-bar { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid #1e2633; color: #8a94a3; font-size: 12.5px; }
+.editor-bar button { background: #18202c; color: #cbd5e1; border: 1px solid #2a3340; border-radius: 6px; padding: 4px 12px; cursor: pointer; }
+.editor-bar button:disabled { opacity: 0.4; cursor: default; }
+.editor { flex: 1; min-height: 0; }
+.chat { width: 420px; }
+.chat.notice { display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 24px; text-align: center; }
+.chat.notice .hint { color: #7e8a9a; font-size: 12.5px; }

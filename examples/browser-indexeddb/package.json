@@ -1,0 +1,29 @@
+{
+  "name": "anyclaude-browser-indexeddb",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Browser-only anyclaude-sdk demo: the agent's built-in file tools run against YOUR IndexedDB (DexieFileSystem), durable across reloads. No backend.",
+  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
+  "dependencies": {
+    "anyclaude-sdk": "^0.4.4",
+    "anyclaude-react": "^0.3.0",
+    "dexie": "^4.0.8",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "codemirror": "^6.0.1",
+    "@codemirror/commands": "^6.7.1",
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.34.0",
+    "@xterm/xterm": "^5.5.0",
+    "@xterm/addon-fit": "^0.10.0"
+  }
+}
