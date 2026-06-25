@@ -1,9 +1,13 @@
 # anyclaude-sdk
 
-Claude Code agent capabilities — tools, the tool loop, multi-turn conversations —
-running **entirely in the browser** via [WebContainer](https://webcontainers.io),
-against **any OpenAI- or Anthropic-compatible LLM endpoint**. No backend, no OAuth,
-no native binaries.
+Claude Code agent capabilities — tools, the tool loop, multi-turn conversations,
+MCP, sub-agents, sessions — against **any OpenAI- or Anthropic-compatible LLM
+endpoint**, running in the **browser** ([WebContainer](https://webcontainers.io)),
+**Node**, and **Bun**. No backend required, no OAuth, no native binaries.
+
+> **Live demo:** [a full IDE running in your browser](https://anyclaude-docs.puter.site/demo/) ·
+> **Docs:** [anyclaude-docs.puter.site](https://anyclaude-docs.puter.site) ·
+> **React UI kit:** [`anyclaude-react`](anyclaude-react/)
 
 It exposes the same `query()` async-generator interface and the same `SDKMessage`
 envelope as `@anthropic-ai/claude-agent-sdk`, so code written against the official
@@ -267,18 +271,75 @@ await fs.writeFile('/app/index.ts', 'export const x = 1')
 const workspace = composeWorkspace(fs, new NoopCommandExecutor())
 ```
 
+## Serverless & the "survivor"
+
+Run `query()` in a serverless function and stream `SDKMessage`s to the browser. For runs longer than the platform's time cap, checkpoint at a turn boundary and continue transparently in a fresh invocation:
+
+```ts
+// pause near the deadline, persist to the store, emit a `paused` message
+query({ prompt, workspace, llm, sessionStore, maxDurationMs: 20_000 })
+// later — resume + continue the tool loop with NO new user message
+query({ workspace, llm, sessionStore, resume: true, continueRun: true })
+```
+
+Pluggable `SessionStore` adapters (all implement `SessionStoreLike`): `SessionStore` (IndexedDB), `MemorySessionStore`, `KVSessionStore` (Vercel KV / Upstash), `RedisSessionStore`, `PostgresSessionStore` (Neon / pg / postgres.js), `SupabaseSessionStore`.
+
+## Client-side tools — server brain, browser hands
+
+Declare tools the **host** executes — e.g. run `bash` in the user's browser WebContainer while the agent loop runs on your server. The run pauses with a `client_tool_request`; the client executes it and you resume with the result:
+
+```ts
+query({ prompt, llm, workspace, sessionId, clientTools: ['bash'] })   // → emits client_tool_request + pauses
+query({ llm, workspace, sessionId, resume: true, continueRun: true, clientToolResults })  // → continues
+```
+
+## Interactive — `ask_user_question`
+
+Provide `onAskUser` and the agent gains an `ask_user_question` tool to put a multiple-choice decision to the user:
+
+```ts
+query({ prompt, workspace, llm, onAskUser: async ({ question, options }) => pickOne(question, options) })
+```
+
+## Hiding your prompt from the browser (projection)
+
+The agent loop runs server-side, so your system prompt, tool instructions, and retrieved context live in the server→LLM request and **never reach the browser**. To also strip sensitive artifacts (reasoning, raw tool output / RAG, model identity) from the streamed messages, wrap the stream — a pure, opt-in output transform:
+
+```ts
+import { projectMessages } from 'anyclaude-sdk'
+for await (const m of projectMessages(query({ /* ... */ }), { preset: 'public' }))
+  res.write(JSON.stringify(m) + '\n')
+```
+
+`paused` and `client_tool_request` control messages are always preserved. (Note: anything that *runs in the browser* — `createAgentClient` mode — necessarily exposes its request; use the server/endpoint path when the prompt is proprietary.)
+
+## React UI kit — `anyclaude-react`
+
+```bash
+npm install anyclaude-react
+```
+
+`useAgent()` plus restylable components — chat (`AgentChat`, `ChatPanel`, `Transcript`, `MarkdownMessage`, `Composer`, `Working`, `ToolCall`) and an IDE set (`Terminal`, `FileExplorer`, `CodeEditor`, `AskUser`). `createAgentClient` / `createEndpointClient` auto-stitch `paused` continuations and run `clientTools` in the browser.
+
+## Examples & live demo
+
+Runnable Vite projects in [`examples/`](examples/): **`browser-ide`** (WebContainer IDE — real shell + Node in the tab), `browser-chat`, `vercel-kv-survivor`, `vercel-supabase-survivor`, `vercel-indexeddb-survivor`, **`vercel-clienttools`** (server brain / browser hands). Try the **[live demo](https://anyclaude-docs.puter.site/demo/)**.
+
 ## API
 
 - `query(options): AsyncGenerator<SDKMessage>` — main entry.
   - `prompt: string | AsyncIterable<SDKUserMessage>`
   - `workspace: FileSystem & CommandExecutor`
   - `llm: LLMClient`
-  - `tools?`, `model?`, `systemPrompt?`, `maxTurns?` (default 50), `cwd?`, `abortController?`
-- `createOpenAIClient(options): LLMClient`
-- `createAnthropicClient(options): LLMClient`
-- `WebContainerWorkspace`, `MemoryFileSystem`, `NoopCommandExecutor`
+  - `tools?`, `extraTools?`, `allowedTools?`/`disallowedTools?`, `model?`, `systemPrompt?`/`appendSystemPrompt?`, `maxTurns?` (default 50), `cwd?`, `abortController?`
+  - serverless: `sessionStore?`, `resume?`, `maxDurationMs?`, `continueRun?`
+  - client tools: `clientTools?`, `clientToolResults?`; interactive: `onAskUser?`
+  - also: `mcpServers?`, `agents?`, `commands?`, `hooks?`, `background?`, `team?`, `memory?`, `permissionMode?`/`canUseTool?`, `messageQueue?`
+- `createOpenAIClient` / `createAnthropicClient` / `createResponsesClient`
+- `WebContainerWorkspace`, `MemoryFileSystem`, `NoopCommandExecutor`, `LocalSandbox`, `composeWorkspace`
+- `defineTool` (custom tools), `projectMessages` (server-side stream redaction)
 - `ALL_CLAUDE_CODE_TOOLS`, individual tools, `toolDefs`, `toolByName`
-- All `SDK*` message types, `ContentBlockParam`, `LLMClient`, `ToolDef`, etc.
+- All `SDK*` message types, `ContentBlockParam`, `LLMClient`, `ToolDef`, `SessionStoreLike`, etc.
 
 ## Differences from the official SDK
 
@@ -286,9 +347,11 @@ const workspace = composeWorkspace(fs, new NoopCommandExecutor())
 |---------|-------------|--------------------|
 | Auth | OAuth token | None required |
 | Backend | claude.ai API | Any OpenAI/Anthropic endpoint |
-| File ops | Native filesystem | WebContainer fs (pluggable) |
-| Commands | Native shell | jsh (WebContainer) |
-| MCP / slash commands / background tasks | Built-in | Not included |
+| Runtime | Node only | Browser, Node, Bun |
+| File ops | Native filesystem | Pluggable (WebContainer / Memory / IndexedDB / local) |
+| Commands | Native shell | jsh (WebContainer) / local / client-side tools |
+| MCP / slash commands / background tasks / sub-agents | Built-in | Built-in |
+| Serverless survivor + prompt projection | — | Built-in |
 
 ## License
 
