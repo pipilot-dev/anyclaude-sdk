@@ -4,7 +4,7 @@
 // persist the returned `session_snapshot`, and — if the server paused at its
 // time budget — re-POST to continue until the run finishes. The function-cap
 // pause is invisible; the server keeps no state.
-import { SessionStore } from 'anyclaude-sdk'
+import { SessionStore } from 'anyclaude-sdk/session'
 
 export type AnyMessage = Record<string, unknown> & { type?: string; subtype?: string }
 export type Status = 'idle' | 'running' | 'paused'
