@@ -1,8 +1,13 @@
 # anyclaude · browser chat (no backend)
 
 A Vite + React demo where the **[anyclaude-sdk](https://www.npmjs.com/package/anyclaude-sdk) agent
-loop runs entirely in the browser tab** — against a keyless LLM endpoint, with no server and no API key.
+loop runs entirely in the browser tab**, with no server.
 UI is built with **[anyclaude-react](https://www.npmjs.com/package/anyclaude-react)** (`<AgentChat>`).
+
+> **The LLM endpoint must allow browser CORS** (the loop calls it directly from the
+> tab). **Kilo (`api.kilo.ai`) is server-only — no CORS — so set `VITE_LLM_BASE`/
+> `VITE_LLM_KEY` to a CORS-enabled provider.** For Kilo, use a server-brain example
+> ([`vercel-clienttools`](../vercel-clienttools)).
 
 ## Run
 
@@ -13,8 +18,8 @@ npm run dev      # http://localhost:5173
 
 ## How it works
 
-- **LLM** — `createOpenAIClient({ baseUrl, model })` pointed at the keyless Kilo gateway (kilo-auto/free, ~200 req/hr free)
-  (`kilo-auto/free`). Override with env vars (below).
+- **LLM** — `createOpenAIClient({ baseUrl, model })`. Point it at a **CORS-enabled**
+  OpenAI/Anthropic-compatible endpoint via the env vars below (Kilo is server-only).
 - **Workspace** — an in-browser `MemoryFileSystem` + a no-op shell (file tools work; `bash` is
   unavailable in the tab). No Node built-ins are bundled (imports come from the SDK's
   browser-clean subpaths: `anyclaude-sdk/query`, `/llm`, `/fs`).
