@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { WebContainer } from '@webcontainer/api'
-import { ChatPanel, Terminal, FileExplorer, CodeEditor, type ShellProcess } from 'anyclaude-react'
-import { makeWebContainerTools } from './webcontainerTools'
+import { ChatPanel, Terminal, FileExplorer, CodeEditor, createWebContainerClientTools, type ShellProcess } from 'anyclaude-react'
 
 const CWD = '/home/work'
 
@@ -39,7 +38,7 @@ export function App() {
 
   // The same WebContainer backs both the visible terminal AND the agent's
   // client-side tools — so you watch the server's agent operate your browser.
-  const clientTools = useMemo(() => (wc ? makeWebContainerTools(wc) : undefined), [wc])
+  const clientTools = useMemo(() => (wc ? createWebContainerClientTools(wc, { cwd: CWD }) : undefined), [wc])
 
   const listDir = useCallback(
     async (dir: string) => {

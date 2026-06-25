@@ -13,13 +13,15 @@ import {
   NoopCommandExecutor,
   composeWorkspace,
   KVSessionStore,
+  WORKSPACE_TOOL_NAMES,
 } from 'anyclaude-sdk'
 import { kv } from '@vercel/kv'
 
 export const config = { maxDuration: 60 } // Hobby allows up to 300s
 
-// Tools the server declares but does NOT run — the browser's WebContainer does.
-const CLIENT_TOOLS = ['bash', 'write_file', 'read_file', 'edit_file', 'list_files']
+// The bash + file tools are declared but NOT run here — the browser's
+// WebContainer runs them (see src/App.tsx → createWebContainerClientTools).
+const CLIENT_TOOLS = [...WORKSPACE_TOOL_NAMES]
 
 interface ClientToolResult {
   tool_use_id: string

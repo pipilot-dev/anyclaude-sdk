@@ -10,7 +10,7 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "baseUrl": ".",
-    "paths": { "anyclaude-sdk": ["../dist/index.d.ts"] },
+    "paths": { "anyclaude-sdk": ["../dist/index.d.ts"], "anyclaude-sdk/*": ["../dist/*"] },
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "types": ["react"]
   },

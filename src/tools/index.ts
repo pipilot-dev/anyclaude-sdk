@@ -43,6 +43,22 @@ export const ALL_CLAUDE_CODE_TOOLS: Tool[] = [
   config,
 ]
 
+/** Built-in tools that operate on the workspace (filesystem + shell). Pass as
+ *  `query({ clientTools: WORKSPACE_TOOL_NAMES })` to execute them on the HOST
+ *  (e.g. a browser WebContainer or IndexedDB FS) instead of server-side. Pair
+ *  with anyclaude-react's `createWorkspaceClientTools(workspace)`. */
+export const WORKSPACE_TOOL_NAMES = [
+  'bash',
+  'write_file',
+  'read_file',
+  'edit_file',
+  'multi_edit',
+  'delete_file',
+  'list_files',
+  'glob',
+  'grep',
+] as const
+
 /** Extract the OpenAI-shape definitions to send to the LLM. */
 export function toolDefs(tools: Tool[]): ToolDef[] {
   return tools.map((t) => t.def)

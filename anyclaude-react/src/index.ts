@@ -1,5 +1,11 @@
 // anyclaude-react — restylable React UI kit for anyclaude-sdk.
 export { createAgentClient, createEndpointClient } from './client.js'
+export {
+  createWorkspaceClientTools,
+  createWebContainerClientTools,
+  type WorkspaceLike,
+  type WorkspaceClientToolsOptions,
+} from './workspaceTools.js'
 export type {
   AgentClient,
   RunFn,

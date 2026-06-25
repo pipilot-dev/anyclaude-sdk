@@ -39,6 +39,10 @@ export interface DexieFileSystemOptions {
   cwd?: string
   /** Wipe all nodes on first open (fresh filesystem). */
   resetOnInit?: boolean
+  /** Use an existing Dexie instance instead of opening one by name — lets the
+   *  filesystem share a database your app already owns. It must declare a
+   *  `nodes` table keyed by `path` (or be a fresh Dexie this FS can version). */
+  db?: unknown
 }
 
 const DEFAULT_FILE_MODE = 0o644
@@ -66,6 +70,7 @@ export class DexieFileSystem implements FileSystem {
   readonly cwd: string
   private readonly dbName: string
   private readonly resetOnInit: boolean
+  private readonly injectedDb: DexieDb | null
   private db: DexieDb | null = null
   private opening: Promise<DexieDb> | null = null
 
@@ -73,6 +78,7 @@ export class DexieFileSystem implements FileSystem {
     this.dbName = dbName
     this.cwd = options.cwd ?? '/'
     this.resetOnInit = options.resetOnInit ?? false
+    this.injectedDb = (options.db as DexieDb | undefined) ?? null
   }
 
   // ---- lifecycle ----
@@ -81,14 +87,24 @@ export class DexieFileSystem implements FileSystem {
     if (this.db) return this.db
     if (this.opening) return this.opening
     this.opening = (async () => {
-      // @ts-ignore optional peer dependency, resolved at runtime
-      const mod = await import('dexie')
-      const Dexie = (mod as { default?: unknown }).default ?? mod
-      const db = new (Dexie as new (name: string) => DexieDb)(this.dbName)
-      db.version(1).stores({
-        // primary key `path`, secondary index `parent`
-        nodes: 'path, parent',
-      })
+      let db: DexieDb
+      if (this.injectedDb) {
+        // Use the caller's Dexie instance. Declare our schema if it isn't open
+        // yet; an already-open db is assumed to carry a compatible `nodes` table.
+        db = this.injectedDb
+        if (!(db as { isOpen?: () => boolean }).isOpen?.()) {
+          db.version(1).stores({ nodes: 'path, parent' })
+        }
+      } else {
+        // @ts-ignore optional peer dependency, resolved at runtime
+        const mod = await import('dexie')
+        const Dexie = (mod as { default?: unknown }).default ?? mod
+        db = new (Dexie as new (name: string) => DexieDb)(this.dbName)
+        db.version(1).stores({
+          // primary key `path`, secondary index `parent`
+          nodes: 'path, parent',
+        })
+      }
       this.db = db
       if (this.resetOnInit) await db.nodes.clear()
       // Ensure the root directory exists.
