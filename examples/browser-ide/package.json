@@ -16,7 +16,7 @@
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
     "anyclaude-react": "^0.2.1",
-    "anyclaude-sdk": "^0.3.0",
+    "anyclaude-sdk": "^0.4.1",
     "codemirror": "^6.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
