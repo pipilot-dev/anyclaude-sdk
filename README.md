@@ -317,8 +317,17 @@ Pluggable `SessionStore` adapters (all implement `SessionStoreLike`): `SessionSt
 Declare tools the **host** executes — e.g. run `bash` in the user's browser WebContainer while the agent loop runs on your server. The run pauses with a `client_tool_request`; the client executes it and you resume with the result:
 
 ```ts
-query({ prompt, llm, workspace, sessionId, clientTools: ['bash'] })   // → emits client_tool_request + pauses
+import { WORKSPACE_TOOL_NAMES } from 'anyclaude-sdk'
+query({ prompt, llm, workspace, sessionId, clientTools: WORKSPACE_TOOL_NAMES })  // → emits client_tool_request + pauses
 query({ llm, workspace, sessionId, resume: true, continueRun: true, clientToolResults })  // → continues
+```
+
+On the browser side, `anyclaude-react` turns those into a ready executor map backed by **any** workspace — a WebContainer (real shell + files), the user's **IndexedDB** (`DexieFileSystem`), OPFS, or memory:
+
+```tsx
+import { createWebContainerClientTools, createWorkspaceClientTools } from 'anyclaude-react'
+useAgent({ endpoint: '/api/agent', clientTools: createWebContainerClientTools(wc) })           // files + bash
+useAgent({ endpoint: '/api/agent', clientTools: createWorkspaceClientTools(new DexieFileSystem('my-db')) }) // IndexedDB
 ```
 
 ## Interactive — `ask_user_question`

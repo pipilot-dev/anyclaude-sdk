@@ -55,14 +55,23 @@ const { messages, streamingText, status, tokens, cost, send, interrupt, clear } 
 
 ## Client-side tools (server brain, browser hands)
 
-Run the agent on your server but execute chosen tools in the browser — e.g. `bash` on a WebContainer. Pair `query({ clientTools: ['bash'] })` server-side with a `clientTools` executor map here; `client_tool_request`s are auto-executed and the results streamed back:
+Run the agent on your server but execute its file/shell tools **in the browser** — against a WebContainer, an IndexedDB filesystem, OPFS, or memory. Pair `query({ clientTools: WORKSPACE_TOOL_NAMES })` server-side with a turnkey executor map here. `client_tool_request`s are auto-executed and the results streamed back; it reuses the real SDK tool implementations, so behavior matches server-side exactly.
 
 ```tsx
-useAgent({
-  endpoint: '/api/agent',
-  clientTools: { bash: async ({ command }) => ({ content: await runOnWebContainer(command) }) },
-})
+import { useAgent, createWebContainerClientTools, createWorkspaceClientTools } from 'anyclaude-react'
+import { DexieFileSystem } from 'anyclaude-sdk/fs'
+
+// real shell + files in a WebContainer:
+useAgent({ endpoint: '/api/agent', clientTools: createWebContainerClientTools(wc) })
+
+// or point the file tools at the user's own IndexedDB (no shell):
+useAgent({ endpoint: '/api/agent', clientTools: createWorkspaceClientTools(new DexieFileSystem('my-db')) })
+
+// fully overridable per tool:
+createWorkspaceClientTools(workspace, { only: ['write_file','read_file'], extra: { bash: myBash } })
 ```
+
+You can still hand-write a `clientTools` map (`{ bash: async ({command}) => ({ content }) }`) for full control.
 
 ## Components
 
