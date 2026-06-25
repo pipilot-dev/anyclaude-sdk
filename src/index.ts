@@ -21,6 +21,12 @@ export * from './mcp/index.js'
 export * from './commands/index.js'
 export * from './background/index.js'
 export * from './queue.js'
+export {
+  projectMessages,
+  projectMessage,
+  type ProjectionOptions,
+  type ProjectionPreset,
+} from './projection.js'
 export * from './team/index.js'
 export * from './session/index.js'
 export * from './memory/index.js'
