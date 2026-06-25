@@ -1,6 +1,6 @@
 {
   "name": "anyclaude-react",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "React UI kit for anyclaude-sdk — restylable hooks + components (useAgent, Transcript, Composer, AgentChat, Terminal, FileExplorer, CodeEditor, ChatPanel, AskUser) with built-in serverless 'survivor' stream-stitching. Build chatbots, agents, research assistants, browser IDEs.",
   "type": "module",
   "main": "./dist/index.js",

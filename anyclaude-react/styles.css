@@ -22,6 +22,11 @@
 }
 
 .ac-transcript { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding: 14px; }
+/* The transcript is a flex column; children must NOT shrink. Tool pills use
+   overflow:hidden (→ flex min-height:0), so without this they collapse to a
+   sliver and the error border reads as a stray red line. They should keep their
+   natural height and let the transcript scroll. */
+.ac-transcript > * { flex-shrink: 0; }
 
 .ac-msg { display: flex; gap: 8px; }
 .ac-msg-user { color: var(--ac-user); }
@@ -37,7 +42,7 @@
 .ac-code-inline { font-family: var(--ac-mono); background: var(--ac-panel); border: 1px solid var(--ac-border); border-radius: 6px; padding: 1px 5px; font-size: 0.9em; }
 .ac-code-block { font-family: var(--ac-mono); background: var(--ac-panel); border: 1px solid var(--ac-border); border-radius: var(--ac-radius); padding: 12px 14px; overflow-x: auto; margin: 10px 0; }
 
-.ac-tool { border: 1px solid var(--ac-border); border-radius: 10px; background: var(--ac-panel); margin: 2px 0; overflow: hidden; }
+.ac-tool { border: 1px solid var(--ac-border); border-radius: 10px; background: var(--ac-panel); margin: 2px 0; overflow: hidden; flex-shrink: 0; }
 .ac-tool-error { border-color: #b3403a; }
 .ac-tool-head { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: 0; color: var(--ac-accent); padding: 8px 12px; cursor: pointer; font: inherit; text-align: left; }
 .ac-tool-caret { color: var(--ac-muted); }
