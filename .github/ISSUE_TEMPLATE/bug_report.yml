@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a problem with anyclaude-sdk or anyclaude-react
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. For security issues, do NOT use this form — see [SECURITY.md](https://github.com/pipilot-dev/anyclaude-sdk/blob/main/SECURITY.md).
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      options:
+        - anyclaude-sdk
+        - anyclaude-react
+        - an example
+        - not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: e.g. anyclaude-sdk@0.4.0
+    validations:
+      required: true
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      options:
+        - Browser (WebContainer)
+        - Browser (Memory/IndexedDB FS)
+        - Node
+        - Bun
+        - Serverless function (Vercel/Netlify/Cloudflare/…)
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: A minimal repro (code snippet or repo link) gets this fixed fastest.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / errors
+      description: Console output or stack traces. Redact any secrets.
+      render: shell

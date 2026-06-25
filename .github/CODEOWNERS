@@ -1,0 +1,7 @@
+# Default owner for everything in the repo.
+# Order matters; the last matching pattern takes precedence.
+* @Hansade2005
+
+/anyclaude-react/ @Hansade2005
+/src/            @Hansade2005
+/.github/        @Hansade2005

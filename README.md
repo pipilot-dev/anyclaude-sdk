@@ -1,5 +1,11 @@
 # anyclaude-sdk
 
+[![npm version](https://img.shields.io/npm/v/anyclaude-sdk.svg)](https://www.npmjs.com/package/anyclaude-sdk)
+[![anyclaude-react](https://img.shields.io/npm/v/anyclaude-react.svg?label=anyclaude-react)](https://www.npmjs.com/package/anyclaude-react)
+[![license](https://img.shields.io/npm/l/anyclaude-sdk.svg)](LICENSE)
+[![docs](https://img.shields.io/badge/docs-anyclaude--docs.puter.site-4dd0e1.svg)](https://anyclaude-docs.puter.site)
+[![live demo](https://img.shields.io/badge/live%20demo-browser%20IDE-4dd0e1.svg)](https://anyclaude-docs.puter.site/demo/)
+
 Claude Code agent capabilities — tools, the tool loop, multi-turn conversations,
 MCP, sub-agents, sessions — against **any OpenAI- or Anthropic-compatible LLM
 endpoint**, running in the **browser** ([WebContainer](https://webcontainers.io)),

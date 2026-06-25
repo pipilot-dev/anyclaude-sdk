@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://anyclaude-docs.puter.site
+    about: API reference, providers, sandboxes, tools, deployment, and the live demo.
+  - name: Security report
+    url: https://github.com/pipilot-dev/anyclaude-sdk/security/advisories/new
+    about: Report a vulnerability privately. Do not open a public issue.
