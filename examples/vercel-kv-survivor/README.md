@@ -24,7 +24,7 @@ vercel env pull .env          # populates KV_REST_API_URL / KV_REST_API_TOKEN
 vercel dev
 ```
 
-LLM defaults to the Kilo gateway (kilo-auto/free; requires an LLM key) endpoint — set `LLM_BASE` / `LLM_MODEL`
+LLM defaults to the keyless Kilo gateway (kilo-auto/free, ~200 req/hr free) — set `LLM_BASE` / `LLM_MODEL`
 / `LLM_KEY` in `.env` to use OpenAI, xAI, Ollama, etc.
 
 ## See the survivor work

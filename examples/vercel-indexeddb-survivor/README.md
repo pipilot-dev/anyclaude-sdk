@@ -18,7 +18,7 @@ The pause is invisible to the user; the server holds zero state between requests
 
 ```bash
 npm install
-cp .env.example .env        # defaults to the Kilo gateway (kilo-auto/free; requires an LLM key)
+cp .env.example .env        # defaults to the keyless Kilo gateway (kilo-auto/free, ~200 req/hr free)
 vercel dev                  # serves the Vite app + /api/agent together
 # or just the frontend (no function): npm run dev
 ```

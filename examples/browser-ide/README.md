@@ -32,5 +32,5 @@ npm run build    # → dist/  (static)
 vercel deploy    # vercel.json applies the COOP/COEP headers
 ```
 
-Optional `.env` (defaults to the Kilo gateway (kilo-auto/free; requires an LLM key) endpoint): `VITE_LLM_BASE`,
+Optional `.env` (defaults to the keyless Kilo gateway (kilo-auto/free, ~200 req/hr free)): `VITE_LLM_BASE`,
 `VITE_LLM_MODEL`, `VITE_LLM_KEY`.

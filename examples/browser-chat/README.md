@@ -13,7 +13,7 @@ npm run dev      # http://localhost:5173
 
 ## How it works
 
-- **LLM** — `createOpenAIClient({ baseUrl, model })` pointed at the Kilo gateway (kilo-auto/free; requires an LLM key)
+- **LLM** — `createOpenAIClient({ baseUrl, model })` pointed at the keyless Kilo gateway (kilo-auto/free, ~200 req/hr free)
   (`kilo-auto/free`). Override with env vars (below).
 - **Workspace** — an in-browser `MemoryFileSystem` + a no-op shell (file tools work; `bash` is
   unavailable in the tab). No Node built-ins are bundled (imports come from the SDK's

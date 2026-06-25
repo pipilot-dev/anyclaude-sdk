@@ -14,7 +14,7 @@ How it works:
 ## Setup
 
 1. **Supabase**: create a project, open the SQL editor, run [`supabase-schema.sql`](./supabase-schema.sql).
-2. **Env**: copy `.env.example` → `.env.local` and set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service-role key — server-side only, never exposed to the browser). `LLM_*` defaults to the Kilo gateway (kilo-auto/free; requires an LLM key)
+2. **Env**: copy `.env.example` → `.env.local` and set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service-role key — server-side only, never exposed to the browser). `LLM_*` defaults to the keyless Kilo gateway (kilo-auto/free, ~200 req/hr free)
 3. **Install**: `npm install`
 
 ## Run / deploy

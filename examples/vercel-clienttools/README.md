@@ -42,7 +42,7 @@ span the function time cap.
 
 ```bash
 npm install
-cp .env.example .env            # set LLM_KEY (+ KV creds, or `vercel env pull`)
+cp .env.example .env            # Kilo is keyless; set KV creds (or `vercel env pull`)
 vercel dev                      # serves the frontend AND api/ with COOP/COEP
 ```
 
