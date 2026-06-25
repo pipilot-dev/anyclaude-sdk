@@ -10,8 +10,8 @@ import type { SDKMessage, ChatMsg, Workspace } from 'anyclaude-sdk' // type-only
 import { AgentChat, type RunFn } from 'anyclaude-react'
 
 const env = import.meta.env
-const BASE = env.VITE_LLM_BASE ?? 'https://the3rdacademy.com/api/v1' // keyless default
-const MODEL = env.VITE_LLM_MODEL ?? 'claude-sonnet-4-6'
+const BASE = env.VITE_LLM_BASE ?? 'https://api.kilo.ai/api/gateway' // keyless default
+const MODEL = env.VITE_LLM_MODEL ?? 'kilo-auto/free'
 
 // Workspace = an in-memory filesystem + a no-op shell (file tools work; bash is
 // unavailable in the browser). Equivalent to composeWorkspace(fs, noopExec).

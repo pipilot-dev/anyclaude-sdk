@@ -3,14 +3,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { query } from '../dist/query.js'
-import { createAnthropicClient } from '../dist/llm/anthropic.js'
+import { createOpenAIClient } from '../dist/llm/openai.js'
 import { LocalSandbox } from '../dist/sandbox/local.js'
 
 const workdir = mkdtempSync(join(tmpdir(), 'bcs-realestate-'))
 const workspace = new LocalSandbox({ cwd: workdir })
 
 // Instrument the LLM client: per-call latency + time-to-first-token + tokens.
-const base = createAnthropicClient({ baseUrl: 'https://the3rdacademy.com/api/v1', model: 'claude-sonnet-4-6' })
+const base = createOpenAIClient({ baseUrl: 'https://api.kilo.ai/api/gateway', model: 'kilo-auto/free' })
 const calls = []
 const llm = {
   async streamChat(messages, opts) {
@@ -43,7 +43,7 @@ const toolPhases = [] // ms spent between an assistant tool_use turn and its too
 
 try {
   for await (const msg of query({
-    prompt: PROMPT, workspace, llm, model: 'claude-sonnet-4-6',
+    prompt: PROMPT, workspace, llm, model: 'kilo-auto/free',
     maxTurns: 40, includePartialMessages: true, abortController: abort,
   })) {
     const now = performance.now()

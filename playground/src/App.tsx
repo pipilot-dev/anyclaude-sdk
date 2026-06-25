@@ -7,8 +7,8 @@ import { FileExplorer } from './components/FileExplorer'
 import { EditorPane } from './components/EditorPane'
 import { TerminalView } from './components/Terminal'
 
-const DEFAULT_BASE_URL = 'https://the3rdacademy.com/api/v1'
-const DEFAULT_MODEL = 'claude-sonnet-4-6'
+const DEFAULT_BASE_URL = 'https://api.kilo.ai/api/gateway'
+const DEFAULT_MODEL = 'kilo-auto/free'
 
 export function App() {
   const [wc, setWc] = useState<WebContainer | null>(null)

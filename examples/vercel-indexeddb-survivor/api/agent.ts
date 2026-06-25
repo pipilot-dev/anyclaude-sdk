@@ -39,9 +39,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const mem = new MemorySessionStore()
   if (hasPrior) await mem.save(sessionId, body.transcript as ChatMsg[])
 
-  const model = process.env.LLM_MODEL ?? 'claude-sonnet-4-6'
+  const model = process.env.LLM_MODEL ?? 'kilo-auto/free'
   const llm = createOpenAIClient({
-    baseUrl: process.env.LLM_BASE ?? 'https://the3rdacademy.com/api/v1',
+    baseUrl: process.env.LLM_BASE ?? 'https://api.kilo.ai/api/gateway',
     model,
     apiKey: process.env.LLM_KEY,
   })

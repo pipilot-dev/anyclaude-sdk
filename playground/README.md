@@ -18,7 +18,7 @@ npm run dev
 ```
 
 Open the printed URL. It defaults to the **keyless** endpoint
-`https://the3rdacademy.com/api/v1` with model `claude-sonnet-4-6` (both editable
+`https://api.kilo.ai/api/gateway` with model `kilo-auto/free` (both editable
 in the top settings row).
 
 Try: *"create an express server in src/server.js, install express, and run it"* —

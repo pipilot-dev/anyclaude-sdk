@@ -6,7 +6,7 @@
 //
 // Configure via env (all optional):
 //   BCS_BASE_URL   Anthropic-compatible base URL (default below)
-//   BCS_MODEL      model id (default claude-sonnet-4-6)
+//   BCS_MODEL      model id (default kilo-auto/free)
 //   BCS_API_KEY    api key (omit for keyless endpoints)
 //   BCS_CWD        working directory (default: a fresh temp dir)
 
@@ -14,11 +14,11 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { query } from '../dist/query.js'
-import { createAnthropicClient } from '../dist/llm/anthropic.js'
+import { createOpenAIClient } from '../dist/llm/openai.js'
 import { LocalSandbox } from '../dist/sandbox/local.js'
 
-const baseUrl = process.env.BCS_BASE_URL ?? 'https://the3rdacademy.com/api/v1'
-const model = process.env.BCS_MODEL ?? 'claude-sonnet-4-6'
+const baseUrl = process.env.BCS_BASE_URL ?? 'https://api.kilo.ai/api/gateway'
+const model = process.env.BCS_MODEL ?? 'kilo-auto/free'
 const apiKey = process.env.BCS_API_KEY // undefined => keyless
 const cwd = process.env.BCS_CWD ?? mkdtempSync(join(tmpdir(), 'bcs-'))
 
@@ -27,7 +27,7 @@ const promptText =
   'Create fib.js that prints the first 15 Fibonacci numbers, then run it with node and confirm the output.'
 
 const workspace = new LocalSandbox({ cwd })
-const llm = createAnthropicClient({ baseUrl, model, apiKey })
+const llm = createOpenAIClient({ baseUrl, model, apiKey })
 
 console.log(`platform=${workspace.platform} cwd=${cwd}\nmodel=${model} @ ${baseUrl}\n`)
 

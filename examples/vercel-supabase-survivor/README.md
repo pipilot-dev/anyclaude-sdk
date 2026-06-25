@@ -14,7 +14,7 @@ How it works:
 ## Setup
 
 1. **Supabase**: create a project, open the SQL editor, run [`supabase-schema.sql`](./supabase-schema.sql).
-2. **Env**: copy `.env.example` → `.env.local` and set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service-role key — server-side only, never exposed to the browser). `LLM_*` defaults to the keyless the3rdacademy endpoint; set your own to use another provider.
+2. **Env**: copy `.env.example` → `.env.local` and set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (service-role key — server-side only, never exposed to the browser). `LLM_*` defaults to the Kilo gateway (kilo-auto/free; requires an LLM key)
 3. **Install**: `npm install`
 
 ## Run / deploy

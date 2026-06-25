@@ -18,7 +18,7 @@ The pause is invisible to the user; the server holds zero state between requests
 
 ```bash
 npm install
-cp .env.example .env        # defaults to the keyless the3rdacademy endpoint
+cp .env.example .env        # defaults to the Kilo gateway (kilo-auto/free; requires an LLM key)
 vercel dev                  # serves the Vite app + /api/agent together
 # or just the frontend (no function): npm run dev
 ```
