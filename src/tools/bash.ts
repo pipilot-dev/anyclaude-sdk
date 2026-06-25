@@ -37,7 +37,14 @@ export const bash: Tool = {
     const timeout =
       typeof input.timeout_ms === 'number' ? input.timeout_ms : undefined
 
-    const { output, exitCode } = await ctx.exec.exec(command, timeout)
+    let result: { output: string; exitCode: number }
+    try {
+      result = await ctx.exec.exec(command, timeout)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : typeof e === 'string' ? e : JSON.stringify(e)
+      return { content: `Failed to run command: ${msg}`, isError: true }
+    }
+    const { output, exitCode } = result
     if (exitCode !== 0) {
       const body = output || '(no output)'
       return {

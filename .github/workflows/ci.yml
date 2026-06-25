@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sdk:
+    name: anyclaude-sdk (type-check + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npx tsc -p tsconfig.json --noEmit
+      - run: npm run build
+
+  react:
+    name: anyclaude-react (type-check + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build the SDK (peer for type resolution)
+        run: npm install && npm run build
+      - name: Type-check + build the React kit
+        working-directory: anyclaude-react
+        run: |
+          npm install
+          npx tsc -p tsconfig.json --noEmit
+          npm run build

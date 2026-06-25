@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: anyclaude-sdk
+abstract: >-
+  Claude Code agent capabilities (tools, the tool loop, MCP, sub-agents,
+  sessions) for any OpenAI- or Anthropic-compatible LLM endpoint, running in the
+  browser (WebContainer), Node, and Bun — with a serverless "survivor",
+  client-side tools, server-side prompt projection, and a React UI kit.
+type: software
+authors:
+  - family-names: Ade
+    given-names: Hans
+license: MIT
+repository-code: "https://github.com/pipilot-dev/anyclaude-sdk"
+url: "https://anyclaude-docs.puter.site"
+keywords:
+  - claude
+  - agent
+  - llm
+  - webcontainer
+  - browser
+  - ai

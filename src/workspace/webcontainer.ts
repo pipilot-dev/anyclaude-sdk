@@ -40,10 +40,22 @@ const textDecoder = new TextDecoder()
 export class WebContainerWorkspace implements FileSystem, CommandExecutor {
   readonly wc: WebContainerLike
   readonly cwd: string
+  private cwdReady: Promise<void> | null = null
 
   constructor(wc: WebContainerLike, cwd?: string) {
     this.wc = wc
     this.cwd = cwd ?? wc.workdir ?? '/home/projects'
+  }
+
+  /** Ensure the working directory exists before spawning into it (memoized).
+   *  A fresh WebContainer has only `/`, so spawning with a missing cwd rejects. */
+  private ensureCwd(): Promise<void> {
+    if (!this.cwdReady) {
+      this.cwdReady = Promise.resolve(this.wc.fs.mkdir(this.cwd, { recursive: true }))
+        .then(() => undefined)
+        .catch(() => undefined)
+    }
+    return this.cwdReady
   }
 
   /** Resolve a possibly-relative path against the workspace cwd. */
@@ -124,10 +136,19 @@ export class WebContainerWorkspace implements FileSystem, CommandExecutor {
     env?: Record<string, string>
   ): Promise<{ output: string; exitCode: number }> {
     const sanitized = sanitizeCommand(command)
-    const proc = await this.wc.spawn('jsh', ['-c', sanitized], {
-      env,
-      cwd: this.cwd,
-    })
+    await this.ensureCwd()
+    let proc: WebContainerProcess
+    try {
+      proc = await this.wc.spawn('jsh', ['-c', sanitized], { env, cwd: this.cwd })
+    } catch (e) {
+      // Last-resort: spawn without an explicit cwd (defaults to /) so a bad cwd
+      // never hard-fails the tool; surface a real message if even that fails.
+      try {
+        proc = await this.wc.spawn('jsh', ['-c', sanitized], { env })
+      } catch {
+        throw new Error(`failed to start shell (jsh): ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
 
     let output = ''
     const reader = proc.output.getReader()

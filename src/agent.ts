@@ -983,9 +983,19 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
                 content = r.content
                 isError = !!r.isError
               } catch (err) {
-                content = `Error executing ${name}: ${
-                  err instanceof Error ? err.message : String(err)
-                }`
+                const detail =
+                  err instanceof Error
+                    ? err.message
+                    : typeof err === 'string'
+                      ? err
+                      : (() => {
+                          try {
+                            return JSON.stringify(err)
+                          } catch {
+                            return String(err)
+                          }
+                        })()
+                content = `Error executing ${name}: ${detail}`
                 isError = true
               }
               if (isError) {

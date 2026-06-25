@@ -8,6 +8,14 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.4.1
+- Fixed the `bash` tool failing with `Error executing bash: [object Object]` on a
+  fresh WebContainer: `WebContainerWorkspace.exec` now ensures the working
+  directory exists before spawning `jsh` (a new container only has `/`), falls
+  back to a default cwd, and surfaces a real error message. The `bash` tool now
+  returns a clean tool error instead of crashing the turn, and the agent loop
+  stringifies non-`Error` tool failures properly.
+
 ### 0.4.0
 - Added `projectMessages` — an opt-in, server-side stream transform that redacts
   system prompt / tool instructions / retrieved context / reasoning / model
