@@ -115,3 +115,6 @@ footer a { color: var(--muted); }
 .tabgroup { margin: 16px 0; }
 .tabgroup .pane { display: none; }
 .tabgroup .pane.active { display: block; }
+
+/* Live demo nav link — accent it so it stands out */
+.nav a.live { color: var(--accent); font-weight: 600; }
