@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Primitives &amp; where tools run — anyclaude-sdk</title>
+  <meta name="description" content="anyclaude-sdk is a standalone agent core you can adopt whole (query) or piecemeal: browser-clean subpaths for the loop, tools, compaction, permissions, sessions, and client-side tool execution." />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
+    <div class="brand-sub">v0.4.8 · MIT</div>
+    <nav class="nav">
+      <a href="index.html">Overview</a>
+      <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
+      <div class="grp">Reference</div>
+      <a href="providers.html">LLM providers</a>
+      <a href="sandboxes.html">Sandboxes &amp; FS</a>
+      <a href="tools.html">Tools</a>
+      <a href="teams.html">Teams &amp; sub-agents</a>
+      <a href="mcp.html">MCP</a>
+      <a href="advanced.html">Sessions, hooks &amp; more</a>
+      <a href="api.html">API reference</a>
+      <a href="primitives.html" class="active">Primitives &amp; where tools run</a>
+      <a href="react.html">React UI kit</a>
+      <div class="grp">Ship</div>
+      <a href="deploy.html">Deploy</a>
+    </nav>
+  </aside>
+
+  <main>
+    <section id="top">
+      <h1>À la carte primitives &amp; where tools run</h1>
+      <p class="tag">anyclaude-sdk is a <b>standalone agent core</b> with a <b>React client adapter</b> — the same shape as Vercel AI SDK. Adopt it whole with <code>query()</code>, or drop in individual pieces: the loop engine, the tools, compaction, permissions, sessions, and — the key one — <b>per-tool control over whether a tool runs on the server or in the browser</b>.</p>
+    </section>
+
+    <section id="rule">
+      <h2><i data-lucide="alert-triangle"></i> One rule: import the browser-clean subpaths</h2>
+      <p>The bare <code>anyclaude-sdk</code> root re-exports <code>LocalSandbox</code> (<code>node:child_process</code>) and the background worker (<code>comlink</code>), so a browser bundler will choke. <b>In browser code, always import from a subpath.</b> Each subpath below is browser-safe.</p>
+    </section>
+
+    <section id="menu">
+      <h2><i data-lucide="layout-grid"></i> The menu</h2>
+      <div class="cards">
+        <div class="card"><h4><code>/query</code></h4><p><code>query</code>, <code>QueryOptions</code> — the full batteries-included agent.</p></div>
+        <div class="card"><h4><code>/loop</code></h4><p><code>runToolLoop</code> — the bare call→execute→append engine.</p></div>
+        <div class="card"><h4><code>/llm</code></h4><p><code>createOpenAIClient</code>/<code>Anthropic</code>/<code>Responses</code> + <code>parseInlineToolCalls</code>.</p></div>
+        <div class="card"><h4><code>/tools</code></h4><p>built-in tools, <code>toolByName</code>, <code>defineTool</code>, <code>WORKSPACE_TOOL_NAMES</code>, <code>ToolContext</code>.</p></div>
+        <div class="card"><h4><code>/fs</code> &amp; <code>/workspace</code></h4><p><code>DexieFileSystem</code> (IndexedDB), <code>OpfsFileSystem</code>, <code>WebContainerWorkspace</code>, <code>MemoryFileSystem</code>.</p></div>
+        <div class="card"><h4><code>/compact</code></h4><p><code>estimateTokens</code>, <code>summarizeHistory</code>, <code>compactWithWindow</code>.</p></div>
+        <div class="card"><h4><code>/permissions</code></h4><p><code>rulesToCanUseTool</code>, <code>isDangerousBash</code>, <code>isReadOnlyTool</code>.</p></div>
+        <div class="card"><h4><code>/session</code></h4><p><code>SessionStore</code> (IndexedDB), <code>Memory</code>/<code>KV</code>/<code>Redis</code>/<code>Postgres</code>/<code>Supabase</code>.</p></div>
+        <div class="card"><h4><code>/skills</code> · <code>/queue</code> · <code>/prompt</code> · <code>/memory</code></h4><p><code>defineSkill</code>, <code>MessageQueue</code>, <code>defaultSystemPrompt</code>, memory store.</p></div>
+      </div>
+    </section>
+
+    <section id="where">
+      <h2><i data-lucide="split"></i> Where tools run — server vs. browser</h2>
+      <p>The principle (same as Vercel AI SDK): <b>a tool runs where its executor lives.</b> A tool with a local <code>run</code> executes on the server; a tool with <b>no</b> local <code>run</code> — or one you name in <code>clientTools</code> — is <b>delegated</b>: the loop emits a <code>client_tool_request</code>, pauses, and the host executes it. This is how you run <code>bash</code> + file ops in the user's browser (a real WebContainer) while the agent loop and your LLM key stay on the server.</p>
+
+      <h3>The one switch</h3>
+      <p>Delegate <i>all</i> built-in file/shell tools to the host in one flag — the server then <b>never</b> runs them against its own (in-memory) filesystem:</p>
+      <div class="code"><pre><code class="language-ts">// SERVER (e.g. a serverless route)
+import { query } from 'anyclaude-sdk/query'
+
+for await (const m of query({
+  prompt, llm, model, sessionId,
+  clientWorkspaceTools: true,                 // ⇐ bash + read/write/edit/list/glob/grep run on the HOST
+  resume: !!body.continueRun, continueRun: body.continueRun,
+  clientToolResults: body.clientToolResults,  // host-executed results, fed back on resume
+})) emit(m)
+// (equivalent to: clientTools: WORKSPACE_TOOL_NAMES)</code></pre></div>
+
+      <h3>The browser side (the adapter)</h3>
+      <div class="code"><pre><code class="language-tsx">// BROWSER
+import { useAgent, createWorkspaceClientTools } from 'anyclaude-react'
+import { WebContainerWorkspace } from 'anyclaude-sdk/workspace'
+import { DexieFileSystem } from 'anyclaude-sdk/fs'
+
+// real shell + files in a WebContainer:
+useAgent({ endpoint: '/agent', clientTools: createWorkspaceClientTools(new WebContainerWorkspace(wc, '/home/projects')) })
+
+// …or the user's OWN IndexedDB (files, no shell):
+useAgent({ endpoint: '/agent', clientTools: createWorkspaceClientTools(new DexieFileSystem('my-db')) })</code></pre></div>
+      <p><code>createWorkspaceClientTools(workspace)</code> reuses the SDK's real tool implementations, so client-side behavior matches server-side exactly. It auto-executes each <code>client_tool_request</code> and resubmits results — the analog of Vercel's <code>addToolResult()</code>.</p>
+
+      <h3>Custom client tools — just omit <code>run</code></h3>
+      <div class="code"><pre><code class="language-ts">import { defineTool } from 'anyclaude-sdk/tools'
+
+// has run  → executes SERVER-side
+const search = defineTool({ name: 'search', description: '…', parameters: { properties: { q: { type: 'string' } }, required: ['q'] },
+  run: async ({ q }, ctx) => ({ content: await db.search(String(q)) }) })
+
+// no run   → auto-delegated to the host (the browser/connector executes it)
+const deploy = defineTool({ name: 'deploy_app', description: '…', parameters: { properties: { provider: { type: 'string' } }, required: ['provider'] } })</code></pre></div>
+
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <p><b>Why this matters:</b> with <code>clientWorkspaceTools</code> on, file/shell tools <i>cannot</i> silently run against a phantom server filesystem — the server only emits the calls. That structurally eliminates the "agent edits an empty in-memory <code>/work</code>" class of bug. Two requirements: the server <code>query({ cwd })</code> must match the browser container root, and pass your real system prompt.</p>
+      </div>
+    </section>
+
+    <section id="loop">
+      <h2><i data-lucide="repeat"></i> Just the loop — <code>runToolLoop</code></h2>
+      <p>Want only the call → execute → append cycle (no sessions/MCP/survivor/sub-agents)? Use the standalone engine — it yields the same <code>SDKMessage</code>s, so <code>anyclaude-react</code> renders it unchanged.</p>
+      <div class="code"><pre><code class="language-ts">import { runToolLoop } from 'anyclaude-sdk/loop'
+
+for await (const m of runToolLoop({
+  history, tools, llm, model,
+  ctx,                              // { fs, exec, cwd, readFiles: new Set() }
+  clientTools: ['bash'],            // delegate inline (duplex / in-browser)
+  onClientTool: async (req) => ({ content: await runInBrowser(req) }),
+})) render(m)</code></pre></div>
+      <p>Inline <code>onClientTool</code> suits duplex/in-browser consumers; for one-way serverless, use <code>query()</code>'s pause/resume (<code>clientTools</code> + <code>clientToolResults</code>).</p>
+    </section>
+
+    <section id="bits">
+      <h2><i data-lucide="puzzle"></i> Other drop-ins</h2>
+      <div class="code"><pre><code class="language-ts">import { estimateTokens, compactWithWindow } from 'anyclaude-sdk/compact'
+import { rulesToCanUseTool, isDangerousBash } from 'anyclaude-sdk/permissions'
+import { parseInlineToolCalls, hasInlineToolCalls } from 'anyclaude-sdk/llm'
+import { MessageQueue } from 'anyclaude-sdk/queue'
+import { defineSkill } from 'anyclaude-sdk/skills'
+
+// keep recent turns verbatim, summarize the older prefix:
+if (estimateTokens(history) > LIMIT) history = await compactWithWindow(history, llm, { keepRecent: 8 })
+
+// gate tools without writing your own logic:
+const canUseTool = rulesToCanUseTool({ deny: ['delete_file'], ask: ['bash'] }, { onAsk: confirm })
+
+// recover tool calls a weak model emitted as TEXT instead of native function-calls:
+if (hasInlineToolCalls(text)) { const { toolCalls } = parseInlineToolCalls(text) }</code></pre></div>
+    </section>
+
+    <section id="vercel">
+      <h2><i data-lucide="git-compare"></i> Mental model vs. Vercel AI SDK</h2>
+      <table class="opts">
+        <tr><th>Vercel AI SDK</th><th>anyclaude</th></tr>
+        <tr><td><code>ai</code> (server core)</td><td><code>anyclaude-sdk</code> (<code>query</code> / <code>runToolLoop</code>)</td></tr>
+        <tr><td><code>@ai-sdk/react</code> (<code>useChat</code>)</td><td><code>anyclaude-react</code> (<code>useAgent</code>)</td></tr>
+        <tr><td>tool <b>with</b> <code>execute</code> → server</td><td><code>defineTool({ run })</code> / built-ins</td></tr>
+        <tr><td>tool <b>without</b> <code>execute</code> → client</td><td>run-less <code>defineTool</code> / <code>clientTools</code> / <code>clientWorkspaceTools</code></td></tr>
+        <tr><td><code>addToolResult()</code> → resubmit</td><td><code>clientToolResults</code> + <code>createWorkspaceClientTools</code> (automatic)</td></tr>
+      </table>
+      <p>Same architecture — plus anyclaude ships the WebContainer / IndexedDB / OPFS executors out of the box. See the <a href="react.html">React UI kit</a> and <a href="deploy.html">Deploy</a> pages for end-to-end wiring.</p>
+    </section>
+  </main>
+</div>
+</body>
+</html>
