@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
+import { MarkdownMessage } from 'anyclaude-react'
+import 'anyclaude-react/styles.css'
 import { createIdbAgentClient, type AnyMessage, type Status } from './agentClient'
 
 interface Entry {
@@ -91,9 +93,12 @@ export function App() {
               <span className="pill">▸ {e.tool ?? 'tool'}</span>
               {e.result && <span className="result"> ⮑ {e.result}</span>}
             </div>
+          ) : e.role === 'assistant' ? (
+            // streamdown markdown (headings, lists, code, links) via the kit
+            <MarkdownMessage key={e.id} text={e.text ?? ''} />
           ) : (
             <div key={e.id} className={`msg ${e.role}`}>
-              <b>{e.role === 'user' ? 'you' : 'agent'}</b>
+              <b>you</b>
               <div>{e.text}</div>
             </div>
           )

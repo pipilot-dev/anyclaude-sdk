@@ -1,4 +1,4 @@
-import { useAgent, Transcript, Composer, Working, renderMarkdown } from 'anyclaude-react'
+import { useAgent, Transcript, Composer, Working } from 'anyclaude-react'
 import 'anyclaude-react/styles.css'
 import './app.css'
 
@@ -20,7 +20,7 @@ export default function App() {
       </header>
 
       <main className="chat">
-        <Transcript messages={messages} streamingText={streamingText} renderMarkdown={renderMarkdown} />
+        <Transcript messages={messages} streamingText={streamingText}/>
         <Working active={status !== 'idle'} paused={status === 'paused'} label="Working" />
       </main>
 
