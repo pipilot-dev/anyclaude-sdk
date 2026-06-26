@@ -18,8 +18,10 @@ export interface DefineToolSpec {
   description: string
   /** Argument schema: JSON-Schema `properties` + optional `required`. Defaults to no args. */
   parameters?: { properties: Record<string, unknown>; required?: string[] }
-  /** Execution method. Receives the parsed input + the tool context (fs/exec/cwd/signal/…). */
-  run: (input: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult> | ToolResult
+  /** Execution method. Receives the parsed input + the tool context (fs/exec/cwd/signal/…).
+   *  OMIT it to make this a CLIENT/delegated tool — the agent loop emits a
+   *  client_tool_request and the host executes it (resume with clientToolResults). */
+  run?: (input: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult> | ToolResult
   /** Optional: spill threshold for large outputs (see Tool.maxResultChars). */
   maxResultChars?: number
 }
@@ -39,8 +41,9 @@ export function defineTool(spec: DefineToolSpec): Tool {
         },
       },
     },
-    run: async (input, ctx) => spec.run(input, ctx),
   }
+  // With a run → server-executed. Without → client-delegated (no run on the Tool).
+  if (spec.run) tool.run = async (input, ctx) => spec.run!(input, ctx)
   if (spec.maxResultChars !== undefined) tool.maxResultChars = spec.maxResultChars
   return tool
 }

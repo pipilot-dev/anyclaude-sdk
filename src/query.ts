@@ -44,6 +44,10 @@ export interface QueryOptions {
   /** Tool names the HOST/client executes (e.g. bash on a browser WebContainer). The agent
    *  emits a `client_tool_request` + pauses; the client runs it and resumes with results. */
   clientTools?: string[]
+  /** One switch: delegate ALL built-in workspace tools (bash + file ops) to the host
+   *  so the server never runs them against its in-memory workspace — execution happens
+   *  client-side (pair with anyclaude-react `createWorkspaceClientTools`). */
+  clientWorkspaceTools?: boolean
   /** Results for client-tool calls, injected before continuing (with continueRun). */
   clientToolResults?: Array<{ tool_use_id: string; content: string | import('./types/index.js').ContentBlockParam[]; is_error?: boolean }>
   cwd?: string
@@ -140,6 +144,7 @@ export function query(options: QueryOptions): Query {
     maxDurationMs: options.maxDurationMs,
     continueRun: options.continueRun,
     clientTools: options.clientTools,
+    clientWorkspaceTools: options.clientWorkspaceTools,
     clientToolResults: options.clientToolResults,
     cwd: options.cwd,
     sessionId: options.sessionId,

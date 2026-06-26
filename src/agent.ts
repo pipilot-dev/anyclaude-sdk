@@ -36,7 +36,7 @@ import type {
   Usage,
 } from './types/index.js'
 import type { FileReadLimits, Tool, ToolContext } from './tools/types.js'
-import { ALL_CLAUDE_CODE_TOOLS, toolByName, toolDefs } from './tools/index.js'
+import { ALL_CLAUDE_CODE_TOOLS, toolByName, toolDefs, WORKSPACE_TOOL_NAMES } from './tools/index.js'
 import { task as taskTool } from './tools/task.js'
 import { askUserQuestion } from './tools/ask_user.js'
 import { loadMcpServers, type McpServers, type McpProxy } from './mcp/index.js'
@@ -113,6 +113,11 @@ export interface AgentOptions {
    *  one, the loop emits a `client_tool_request` + pauses; the client runs it and
    *  resumes (continueRun) with `clientToolResults`. (e.g. bash on a browser WebContainer.) */
   clientTools?: string[]
+  /** One switch to delegate ALL built-in workspace tools (bash + file ops) to the
+   *  host: the server emits client_tool_request for them and NEVER runs them
+   *  against its own (in-memory) workspace — execution happens client-side
+   *  (e.g. a browser WebContainer / IndexedDB via createWorkspaceClientTools). */
+  clientWorkspaceTools?: boolean
   /** Results for client-tool calls, injected into the transcript before continuing. */
   clientToolResults?: Array<{ tool_use_id: string; content: string | ContentBlockParam[]; is_error?: boolean }>
   cwd?: string
@@ -425,6 +430,13 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
     tools = [...localTools, ...loaded.tools]
     mcpStatuses = loaded.statuses.map((s) => ({ name: s.name, status: s.status }))
   }
+
+  // Delegation set: explicit clientTools, plus (one switch) every built-in
+  // workspace tool when clientWorkspaceTools is on, plus any tool with no `run`
+  // (Vercel-style "no execute = client"). These emit client_tool_request and are
+  // never executed on the server.
+  if (options.clientWorkspaceTools) for (const n of WORKSPACE_TOOL_NAMES) clientTools.add(n)
+  for (const t of tools) if (!t.run) clientTools.add(t.def.function.name)
 
   const defs = toolDefs(tools)
   const byName = toolByName(tools)
@@ -892,8 +904,11 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
         let isError = false
         let extraContext = ''
 
-        if (!tool) {
-          content = `Error: unknown tool "${name}"`
+        if (!tool || !tool.run) {
+          // Unknown, or a run-less (client-delegated) tool that somehow reached
+          // server execution — both are errors here (delegated tools are handled
+          // above via clientTools).
+          content = `Error: ${tool ? `tool "${name}" has no server executor (it is client-delegated)` : `unknown tool "${name}"`}`
           isError = true
         } else {
           // PreToolUse hooks (may block or inject context).

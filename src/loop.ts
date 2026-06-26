@@ -45,6 +45,16 @@ export interface RunToolLoopOptions {
   signal?: AbortSignal
   /** Optional permission gate; a `deny` result turns into an error tool_result. */
   canUseTool?: CanUseTool
+  /** Tool names to DELEGATE to the host instead of running via `ctx` (inline). A
+   *  tool with no `run` is auto-delegated too (Vercel-style "no execute = client"). */
+  clientTools?: string[]
+  /** Executor for delegated tools — runs the call (e.g. on a browser WebContainer)
+   *  and returns the result inline. Required if any tool is delegated. */
+  onClientTool?: (req: {
+    tool_use_id: string
+    name: string
+    input: Record<string, unknown>
+  }) => Promise<{ content: unknown; is_error?: boolean }> | { content: unknown; is_error?: boolean }
   /** Emit `stream_event` text deltas as the assistant streams. */
   includePartialMessages?: boolean
   /** Correlation id stamped on every emitted SDKMessage. */
@@ -122,8 +132,9 @@ function createPushQueue<T>() {
  *   for await (const m of runToolLoop({ history, tools, llm, model, ctx })) render(m)
  */
 export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDKMessage> {
-  const { history, llm, model, ctx, signal, canUseTool } = opts
+  const { history, llm, model, ctx, signal, canUseTool, onClientTool } = opts
   const tools = opts.tools
+  const clientTools = new Set(opts.clientTools ?? [])
   const maxTurns = opts.maxTurns ?? 50
   const sessionId = opts.sessionId ?? uuid()
   const emitPartial = !!opts.includePartialMessages
@@ -233,7 +244,24 @@ export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDK
       let content: string | ContentBlockParam[] = ''
       let isError = false
 
-      if (!tool) {
+      // Delegated tool (listed in clientTools, or has no `run`): execute on the
+      // host via onClientTool instead of `ctx` — never touches the server FS.
+      const delegated = clientTools.has(name) || (tool != null && !tool.run)
+      if (delegated) {
+        if (!onClientTool) {
+          content = `No client executor for "${name}" (delegated tool; pass onClientTool).`
+          isError = true
+        } else {
+          try {
+            const r = await onClientTool({ tool_use_id: call.id, name, input })
+            content = (typeof r.content === 'string' ? r.content : JSON.stringify(r.content ?? '')) as string
+            isError = !!r.is_error
+          } catch (err) {
+            content = `Error (client) ${name}: ${err instanceof Error ? err.message : String(err)}`
+            isError = true
+          }
+        }
+      } else if (!tool) {
         content = `Error: unknown tool "${name}"`
         isError = true
       } else {
@@ -246,7 +274,7 @@ export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDK
         } else {
           if ('updatedInput' in decision && decision.updatedInput) input = decision.updatedInput
           try {
-            const r = await tool.run(input, ctx)
+            const r = await tool.run!(input, ctx)
             content = r.content
             isError = !!r.isError
           } catch (err) {

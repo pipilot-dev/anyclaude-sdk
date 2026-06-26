@@ -81,7 +81,10 @@ export interface ToolResult {
 /** A tool pairs an OpenAI-shape function definition with its implementation. */
 export interface Tool {
   def: ToolDef
-  run(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult>
+  /** Server-side executor. OMIT to make the tool client-delegated (Vercel-style
+   *  "no execute = client"): the loop emits a client_tool_request instead of
+   *  running it, and the host supplies the result. */
+  run?(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult>
   /**
    * Max result size in characters before the agent loop spills the full output
    * to a file and replaces it with a preview + path (see large-output handling).
