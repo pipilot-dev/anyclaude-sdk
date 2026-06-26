@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.5.0 · MIT</div>
+    <div class="brand-sub">v0.6.0 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
@@ -117,6 +117,23 @@ query({ workspace, llm, model, sessionId, resume: true, continueRun: true,
       <p>Full working example: <a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-clienttools">vercel-clienttools</a>.</p>
     </section>
 
+    <section id="cc-router">
+      <h2><i data-lucide="route"></i> Recipe 4 — Drop-in Claude Code router <span class="pill">0.6.0</span></h2>
+      <p>Run <b>Claude Code itself against any OpenAI-compatible model</b> — DeepSeek, Qwen, GLM, Kimi, local Ollama, OpenRouter. The <code>anyclaude-sdk/anthropic-endpoint</code> subpath bridges the Anthropic Messages API to the SDK's <code>LLMClient</code>: stand up an Anthropic-compatible <code>/v1/messages</code> server, point Claude Code at it with <code>ANTHROPIC_BASE_URL</code>, and every turn is served by your chosen model. Unlike a naive proxy, inline tool-call <b>dialects are recovered into proper <code>tool_use</code> blocks</b> (via model profiles), so tool use actually works on cheap models.</p>
+      <div class="code"><pre><code class="language-ts">// server (Node) — one turn per request; Claude Code runs the loop
+import { createOpenAIClient } from 'anyclaude-sdk/llm'
+import { anthropicToChat, anthropicSSE } from 'anyclaude-sdk/anthropic-endpoint'
+
+const llm = createOpenAIClient({ baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', apiKey: process.env.DEEPSEEK_API_KEY })
+
+// POST /v1/messages
+const req = anthropicToChat(body)                 // Anthropic request → ChatMsg[] + tools
+for await (const evt of anthropicSSE(llm, req, { model: 'deepseek-chat' })) res.write(evt) // → Anthropic SSE</code></pre></div>
+      <div class="code"><pre><code class="language-bash"># then point Claude Code at it:
+ANTHROPIC_BASE_URL=http://localhost:8787 ANTHROPIC_API_KEY=dummy claude</code></pre></div>
+      <p>Runnable, config-driven (default / background / long-context routing): <a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/claude-code-router">examples/claude-code-router</a>. Also exports <code>streamResultToAnthropicMessage</code> (non-streaming) and <code>anthropicToolsToDefs</code>.</p>
+    </section>
+
     <section id="examples">
       <h2><i data-lucide="boxes"></i> Working examples</h2>
       <p>Each is a runnable Vite project (Vercel-ready, or browser-only) in the repo's <code>examples/</code>:</p>
@@ -127,6 +144,7 @@ query({ workspace, llm, model, sessionId, resume: true, continueRun: true,
         <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-supabase-survivor">vercel-supabase-survivor</a></h4><p>Survivor with Supabase as the SessionStore.</p></div>
         <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/vercel-indexeddb-survivor">vercel-indexeddb-survivor</a></h4><p>Stateless function + browser IndexedDB session + survivor.</p></div>
         <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/browser-chat">browser-chat</a></h4><p>Minimal browser chatbot with <code>useAgent</code>.</p></div>
+        <div class="card"><h4><a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/claude-code-router">claude-code-router</a></h4><p>Anthropic-compatible server: run Claude Code against any OpenAI model, with tool-dialect recovery.</p></div>
       </div>
     </section>
 

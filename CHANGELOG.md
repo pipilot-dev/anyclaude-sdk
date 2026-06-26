@@ -8,6 +8,10 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.6.0
+- **`anyclaude-sdk/anthropic-endpoint`** (new browser-clean subpath) — bridge the Anthropic Messages API to any OpenAI-compatible model via the SDK's `LLMClient`. Stand up a drop-in **claude-code-router**: point Claude Code (or any Anthropic-Messages client) at your server via `ANTHROPIC_BASE_URL` and run it against DeepSeek / Qwen / GLM / Kimi / local Ollama. Exports: `anthropicToChat` (Anthropic request → `ChatMsg[]` + `ToolDef[]`, splitting `tool_result` blocks into `tool` messages), `anthropicSSE` (run a turn → the exact Anthropic SSE event sequence), `streamResultToAnthropicMessage` (non-streaming), `anthropicToolsToDefs`. Inline tool-call **dialects are recovered into proper `tool_use` blocks**, so tool use works on cheap/open models — and raw `<tool_call>` markup never leaks into text deltas.
+- New example **`examples/claude-code-router`** — a zero-dependency Node server demonstrating the above, with config-driven routing (default / background / long-context) across providers.
+
 ### 0.5.0
 - **Reliable tool use on cheap/open models** — three layers so the same agent loop works beyond GPT/Claude (Qwen, DeepSeek, Kimi, GLM, Mistral, Llama/Ollama), exported from `anyclaude-sdk/llm`:
   - **Tool-call dialects** (`parseToolCalls`, `hasToolCalls`, `dialects`): recover tool calls a model emitted as TEXT — `xml-function`, `hermes` (`<tool_call>{json}</tool_call>`), and `json-fence` (```json blocks). Conservative detection won't misread ordinary JSON output. `parseInlineToolCalls` now spans all three (back-compat).

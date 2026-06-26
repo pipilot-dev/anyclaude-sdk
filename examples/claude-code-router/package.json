@@ -1,0 +1,13 @@
+{
+  "name": "anyclaude-claude-code-router",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0",
+  "description": "Anthropic Messages API-compatible router backed by anyclaude-sdk — run Claude Code against any OpenAI-compatible model.",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "anyclaude-sdk": "^0.6.0"
+  }
+}
