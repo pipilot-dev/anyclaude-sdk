@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.4.7
+- `runToolLoop(opts)` (`anyclaude-sdk/loop`) — the standalone in-process tool-loop engine that powers query() (call → execute via ctx → append → stop on no-tool-calls/maxTurns), decoupled from sessions/MCP/survivor/sub-agents. Same SDKMessage envelopes, browser-clean. For consumers who want just the loop.
+
 ### 0.4.6
 - `compactWithWindow(history, llm, { keepRecent })` — window-aware compaction: keep recent turns verbatim + summarize the older prefix (far less lossy than `summarizeHistory`).
 - Surfaced the inline tool-call parser via `anyclaude-sdk/llm` (`hasInlineToolCalls`, `parseInlineToolCalls`) — recover tool calls a weak model emitted as text.
