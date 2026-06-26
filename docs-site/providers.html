@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.4.8 · MIT</div>
+    <div class="brand-sub">v0.4.9 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
@@ -64,6 +64,27 @@ type StreamResult = {
   stopReason?: StopReason
 }</code></pre></div>
       <p>Because it's just an interface, you can also <b>bring your own client</b> — wrap any SDK or HTTP API that can stream text and emit tool calls, and the agent loop won't know the difference.</p>
+
+      <h3 id="byo">Bring your own transport, reuse the SDK's codec</h3>
+      <p>If your custom client speaks the OpenAI <code>/chat/completions</code> shape but you own the transport (a proxy, an encrypted RPC, a different URL), don't re-implement the <code>ChatMsg → wire</code> conversion — import it. <code>anyclaude-sdk/llm</code> exports the same mappers <code>createOpenAIClient</code> uses internally, plus <code>consumeSSE</code> and the inline tool-call parser, so your client stays in lockstep with the SDK's content-block handling (text / image / PDF <code>document</code> / <code>tool_result</code>) and never drifts.</p>
+      <div class="code"><pre><code class="language-ts">import {
+  toOpenAIMessages,        // ChatMsg[] → OpenAI messages[] (text/image/PDF/tool_result)
+  consumeSSE,              // read an SSE body, one data: payload at a time
+  parseInlineToolCalls,    // recover tool calls a weak model emitted as text
+  type LLMClient, type ChatMsg, type StreamResult, // fully typed, no bare-root import
+} from 'anyclaude-sdk/llm'
+
+const myClient: LLMClient = {
+  async streamChat(messages, opts) {
+    const body = { model: opts.model, messages: toOpenAIMessages(messages), stream: true,
+                   ...(opts.tools?.length ? { tools: opts.tools, tool_choice: 'auto' } : {}) }
+    const res = await myTransport.post('/chat', seal(body), { signal: opts.signal }) // your own transport
+    let text = ''
+    await consumeSSE(res.body, (data) => { /* accumulate deltas, call opts.onToken */ })
+    return { text, toolCalls: [], model: opts.model ?? '', stopReason: 'end_turn' }
+  },
+}</code></pre></div>
+      <p>Also exported: <code>toOpenAIMessage</code> (singular), <code>blocksToOpenAIContent</code>, <code>blocksToText</code>, the <code>OpenAIChatMessage</code> type, and the client types <code>ToolCall</code> / <code>ToolDef</code> / <code>StopReason</code> / <code>Usage</code> / <code>ContentBlockParam</code> — all from the browser-clean <code>/llm</code> subpath (no <code>node:</code> modules pulled).</p>
     </section>
 
     <section id="clients">

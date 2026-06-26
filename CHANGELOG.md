@@ -8,6 +8,10 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.4.9
+- `anyclaude-sdk/llm` now exports the canonical OpenAI wire mappers — `toOpenAIMessages(msgs)` / `toOpenAIMessage(msg)`, `blocksToOpenAIContent`, `blocksToText`, and the `OpenAIChatMessage` type. Custom `LLMClient` authors who bring their own transport (proxy / encryption / alternate URL) can reuse the SDK's exact `ChatMsg → /chat/completions` conversion (text / image / PDF `document` / `tool_result`) instead of forking it and drifting.
+- `anyclaude-sdk/llm` now re-exports the LLM client types (`LLMClient`, `ChatMsg`, `StreamResult`, `ToolCall`, `ToolDef`, `StopReason`, `Usage`, `ContentBlockParam`) as type-only — so custom-client authors get full typing from the browser-clean subpath without importing the bare root (which pulls `node:child_process` + comlink into a browser bundle).
+
 ### 0.4.8
 - `query({ clientWorkspaceTools: true })` — one switch to delegate ALL built-in file/bash tools to the host (server emits client_tool_request, never runs them against its in-memory FS). Pair with anyclaude-react createWorkspaceClientTools.
 - Run-less `defineTool({ name, description, parameters })` (no `run`) is now auto-delegated as a client tool (Vercel "no execute = client" convention). `Tool.run` is optional.

@@ -180,8 +180,23 @@ interface OpenAIStreamChunk {
   }>
 }
 
+/** A single message in OpenAI `/chat/completions` wire shape. */
+export type OpenAIChatMessage = Record<string, unknown>
+
+/**
+ * Convert the SDK's provider-neutral `ChatMsg[]` into OpenAI `/chat/completions`
+ * `messages`. Exported so custom `LLMClient` authors who bring their own
+ * transport (proxy, encryption, alternate URL) can reuse the SDK's canonical
+ * wire conversion instead of forking it — keeping content-block mapping
+ * (text / image / PDF `document` / `tool_result`) in lockstep with the
+ * built-in `createOpenAIClient`.
+ */
+export function toOpenAIMessages(messages: ChatMsg[]): OpenAIChatMessage[] {
+  return messages.map(toOpenAIMessage)
+}
+
 /** Convert our provider-neutral ChatMsg into an OpenAI chat message. */
-function toOpenAIMessage(msg: ChatMsg): Record<string, unknown> {
+export function toOpenAIMessage(msg: ChatMsg): OpenAIChatMessage {
   if (msg.role === 'tool') {
     return {
       role: 'tool',
@@ -204,7 +219,11 @@ function toOpenAIMessage(msg: ChatMsg): Record<string, unknown> {
   return { role: msg.role, content: blocksToOpenAIContent(msg.content) }
 }
 
-function blocksToOpenAIContent(blocks: ContentBlockParam[]): unknown {
+/**
+ * Map content blocks to OpenAI multimodal `content` parts
+ * (`text` / `image_url` / `file`). Exported for custom `LLMClient` authors.
+ */
+export function blocksToOpenAIContent(blocks: ContentBlockParam[]): unknown {
   const parts: unknown[] = []
   for (const b of blocks) {
     if (b.type === 'text') parts.push({ type: 'text', text: b.text })
@@ -233,7 +252,11 @@ function blocksToOpenAIContent(blocks: ContentBlockParam[]): unknown {
   return parts.length ? parts : ''
 }
 
-function blocksToText(blocks: ContentBlockParam[]): string {
+/**
+ * Flatten `text` + nested `tool_result` content blocks to a plain string
+ * (used for `assistant`/`tool` roles). Exported for custom `LLMClient` authors.
+ */
+export function blocksToText(blocks: ContentBlockParam[]): string {
   return blocks
     .map((b) => {
       if (b.type === 'text') return b.text
