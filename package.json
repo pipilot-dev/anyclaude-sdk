@@ -1,22 +1,53 @@
 {
   "name": "anyclaude-sdk",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "Standalone, browser-compatible SDK providing Claude Code agent capabilities (tools, tool loop, multi-turn, MCP, sub-agents, sessions) against any OpenAI/Anthropic-compatible LLM endpoint. Runs in the browser (WebContainer), Node, and Bun — no backend required.",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
-    "./query": { "types": "./dist/query.d.ts", "import": "./dist/query.js" },
-    "./workspace": { "types": "./dist/workspace/index.d.ts", "import": "./dist/workspace/index.js" },
-    "./sandbox": { "types": "./dist/sandbox/index.d.ts", "import": "./dist/sandbox/index.js" },
-    "./fs": { "types": "./dist/fs/index.d.ts", "import": "./dist/fs/index.js" },
-    "./llm": { "types": "./dist/llm/index.d.ts", "import": "./dist/llm/index.js" },
-    "./tools": { "types": "./dist/tools/index.d.ts", "import": "./dist/tools/index.js" },
-    "./session": { "types": "./dist/session/index.d.ts", "import": "./dist/session/index.js" },
-    "./memory": { "types": "./dist/memory/index.d.ts", "import": "./dist/memory/index.js" },
-    "./package.json": "./package.json"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./query": {
+      "types": "./dist/query.d.ts",
+      "import": "./dist/query.js"
+    },
+    "./workspace": {
+      "types": "./dist/workspace/index.d.ts",
+      "import": "./dist/workspace/index.js"
+    },
+    "./sandbox": {
+      "types": "./dist/sandbox/index.d.ts",
+      "import": "./dist/sandbox/index.js"
+    },
+    "./fs": {
+      "types": "./dist/fs/index.d.ts",
+      "import": "./dist/fs/index.js"
+    },
+    "./llm": {
+      "types": "./dist/llm/index.d.ts",
+      "import": "./dist/llm/index.js"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "import": "./dist/tools/index.js"
+    },
+    "./session": {
+      "types": "./dist/session/index.d.ts",
+      "import": "./dist/session/index.js"
+    },
+    "./memory": {
+      "types": "./dist/memory/index.d.ts",
+      "import": "./dist/memory/index.js"
+    },
+    "./package.json": "./package.json",
+    "./compact": {
+      "types": "./dist/compact.d.ts",
+      "import": "./dist/compact.js"
+    }
   },
   "sideEffects": false,
   "files": [
@@ -64,12 +95,24 @@
     "e2b": "*"
   },
   "peerDependenciesMeta": {
-    "@webcontainer/api": { "optional": true },
-    "dexie": { "optional": true },
-    "e2b": { "optional": true },
-    "@vercel/sandbox": { "optional": true },
-    "@daytonaio/sdk": { "optional": true },
-    "@cloudflare/sandbox": { "optional": true }
+    "@webcontainer/api": {
+      "optional": true
+    },
+    "dexie": {
+      "optional": true
+    },
+    "e2b": {
+      "optional": true
+    },
+    "@vercel/sandbox": {
+      "optional": true
+    },
+    "@daytonaio/sdk": {
+      "optional": true
+    },
+    "@cloudflare/sandbox": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^26.0.0",

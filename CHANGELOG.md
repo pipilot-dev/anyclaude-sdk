@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.4.5
+- Added browser-safe subpath export `anyclaude-sdk/compact` (`estimateTokens`, `summarizeHistory`) so compaction can be used à la carte without the root barrel pulling Node/comlink.
+
 ### 0.4.4
 - Added `WORKSPACE_TOOL_NAMES` (bash + file tools) — pass as `query({ clientTools: WORKSPACE_TOOL_NAMES })` to run the workspace tools on the host (browser WebContainer / IndexedDB) instead of server-side.
 - `DexieFileSystem` now accepts an existing Dexie instance via `{ db }`, so the IndexedDB workspace can share a database your app already owns.
