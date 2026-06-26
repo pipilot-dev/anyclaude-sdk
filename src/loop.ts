@@ -28,6 +28,7 @@ import type {
 } from './types/index.js'
 import type { Tool, ToolContext } from './tools/types.js'
 import { toolByName, toolDefs } from './tools/index.js'
+import { validateToolArguments } from './llm/repair.js'
 import { uuid } from './util/ids.js'
 
 export interface RunToolLoopOptions {
@@ -59,6 +60,13 @@ export interface RunToolLoopOptions {
   includePartialMessages?: boolean
   /** Correlation id stamped on every emitted SDKMessage. */
   sessionId?: string
+  /**
+   * Validate tool arguments before executing; on malformed/incomplete JSON,
+   * feed the model a corrective `is_error` tool_result (with the expected
+   * schema) instead of running the tool with garbage, so it self-heals.
+   * Default `true`. Set `false` to pass raw args straight through.
+   */
+  repairToolCalls?: boolean
 }
 
 const emptyUsage = (): Usage => ({ input_tokens: 0, output_tokens: 0 })
@@ -135,6 +143,7 @@ export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDK
   const { history, llm, model, ctx, signal, canUseTool, onClientTool } = opts
   const tools = opts.tools
   const clientTools = new Set(opts.clientTools ?? [])
+  const repair = opts.repairToolCalls !== false
   const maxTurns = opts.maxTurns ?? 50
   const sessionId = opts.sessionId ?? uuid()
   const emitPartial = !!opts.includePartialMessages
@@ -244,6 +253,16 @@ export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDK
       let content: string | ContentBlockParam[] = ''
       let isError = false
 
+      // Repair: validate args against the tool's schema before running. On a
+      // malformed/incomplete call, hand the model a corrective tool_result so
+      // it retries with valid JSON instead of executing with garbage.
+      const check = repair && tool ? validateToolArguments(tool.def, call.function.arguments) : null
+      if (check && !check.ok) {
+        content = check.error!
+        isError = true
+      } else {
+      if (check) input = check.input
+
       // Delegated tool (listed in clientTools, or has no `run`): execute on the
       // host via onClientTool instead of `ctx` — never touches the server FS.
       const delegated = clientTools.has(name) || (tool != null && !tool.run)
@@ -282,6 +301,7 @@ export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDK
             isError = true
           }
         }
+      }
       }
 
       const textOut = resultToText(content)

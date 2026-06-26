@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.4.9 · MIT</div>
+    <div class="brand-sub">v0.5.0 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
@@ -85,6 +85,44 @@ const myClient: LLMClient = {
   },
 }</code></pre></div>
       <p>Also exported: <code>toOpenAIMessage</code> (singular), <code>blocksToOpenAIContent</code>, <code>blocksToText</code>, the <code>OpenAIChatMessage</code> type, and the client types <code>ToolCall</code> / <code>ToolDef</code> / <code>StopReason</code> / <code>Usage</code> / <code>ContentBlockParam</code> — all from the browser-clean <code>/llm</code> subpath (no <code>node:</code> modules pulled).</p>
+    </section>
+
+    <section id="reliability">
+      <h2><i data-lucide="shield-check"></i> Reliable tool use on cheap / open models <span class="pill">0.5.0</span></h2>
+      <p>Frontier models (GPT, Claude) emit clean native function-calls. The cheaper and open models people route to — Qwen, DeepSeek, Kimi/Moonshot, GLM, Mistral, Llama via Ollama — frequently <b>don't</b>: they narrate tool calls as text in their own "dialect," or emit malformed/incomplete argument JSON. anyclaude-sdk closes that gap with three layers so the same agent loop works across the long tail, not just the frontier.</p>
+
+      <h3>1 · Tool-call dialects</h3>
+      <p>When a model skips native <code>tool_calls</code>, the client recovers the call from text. Three pluggable dialects ship in <code>anyclaude-sdk/llm</code>:</p>
+      <table class="opts">
+        <tr><th>Dialect</th><th>Shape</th><th>Common in</th></tr>
+        <tr><td><code>xml-function</code></td><td><code>&lt;function=write_file&gt;&lt;parameter=path&gt;…&lt;/parameter&gt;&lt;/function&gt;</code></td><td>vLLM, many relays</td></tr>
+        <tr><td><code>hermes</code></td><td><code>&lt;tool_call&gt;{"name":…,"arguments":{…}}&lt;/tool_call&gt;</code></td><td>Qwen, Hermes, Ollama models</td></tr>
+        <tr><td><code>json-fence</code></td><td>a <code>```json</code> block with <code>{"name":…,"arguments":…}</code></td><td>DeepSeek, Mistral, generic</td></tr>
+      </table>
+      <p>Use <code>parseToolCalls(text, { dialects })</code> directly, or let the client do it automatically. The detector is conservative — ordinary JSON the model prints for the user is not misread as a tool call.</p>
+
+      <h3>2 · Model profiles (auto-detected)</h3>
+      <p>The client picks per-model defaults — which dialects to try, <code>tool_choice</code>, <code>parallel_tool_calls</code>, and a sane temperature — from the model id. Pass <code>profile</code> to override, or omit it to auto-detect. Explicit options always win.</p>
+      <div class="code"><pre><code class="language-ts">import { createOpenAIClient } from 'anyclaude-sdk/llm'
+
+// auto-detected: 'qwen' profile → hermes/xml/json dialects, parallel off, temp 0.3
+const llm = createOpenAIClient({ baseUrl: 'http://localhost:11434/v1', model: 'qwen2.5-coder:7b' })
+
+// or force a profile / custom dialects:
+const llm2 = createOpenAIClient({ baseUrl, model, profile: 'deepseek' })
+const llm3 = createOpenAIClient({ baseUrl, model, toolDialects: ['hermes'] })</code></pre></div>
+      <p>Built-ins: <code>openai</code>, <code>anthropic</code> (native, no fallback) · <code>qwen</code>, <code>deepseek</code>, <code>moonshot</code> (Kimi), <code>zhipu</code> (GLM), <code>mistral</code>, <code>llama</code> · <code>generic</code> (unknown models: full fallback + guidance). <code>toolGuidancePrompt(tools)</code> returns a short scaffolding prompt you can append for the weakest models.</p>
+
+      <h3>3 · Self-healing argument repair</h3>
+      <p>Before a tool runs, the loop validates the model's arguments against the tool schema. On malformed or incomplete JSON it does <b>not</b> execute with garbage — it returns a corrective <code>is_error</code> tool_result naming exactly what was wrong plus the expected schema, so the model retries with a valid call. On by default; set <code>query({ repairToolCalls: false })</code> to opt out.</p>
+      <div class="code"><pre><code class="language-text">Missing required argument for "write_file": "content". Call it again
+including it. Expected: { path: string (required), content: string (required) }</code></pre></div>
+
+      <h3>Prove it on your endpoints</h3>
+      <p>Don't take our word for it — the repo ships a harness that runs the real loop against any models you list and prints a pass/fail matrix (native vs. with-anyclaude):</p>
+      <div class="code"><pre><code class="language-bash">npm run build
+node scripts/compat-matrix.mjs ./compat.config.json   # your endpoints; keys via env:NAME</code></pre></div>
+      <p>It scores each model on "called the tool <i>and</i> used the result." Models that fail native often pass once dialects + repair are on — that delta is the point.</p>
     </section>
 
     <section id="clients">

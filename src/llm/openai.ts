@@ -6,7 +6,8 @@ import type {
   ToolCall,
   ToolDef,
 } from '../types/index.js'
-import { parseInlineToolCalls } from './inlineTools.js'
+import { parseToolCalls } from './dialects.js'
+import { profileForModel, type ModelProfile } from './profiles.js'
 
 export interface OpenAIClientOptions {
   /** API key, or a function returning one per request (for round-robin key pools). */
@@ -25,6 +26,20 @@ export interface OpenAIClientOptions {
   reasoningEffort?: string
   /** Allow the model to batch multiple tool calls → sets `parallel_tool_calls` (when tools present). */
   parallelToolCalls?: boolean
+  /**
+   * Per-model quirks for reliable tool use on cheap/open endpoints. Pass a
+   * `ModelProfile`, a built-in name ('qwen'|'deepseek'|'moonshot'|'zhipu'|
+   * 'mistral'|'llama'|'openai'|'anthropic'|'generic'), or omit to AUTO-DETECT
+   * from the model id. The profile supplies inline tool-call dialects + sane
+   * tool_choice / parallel / temperature defaults; explicit options above always win.
+   */
+  profile?: string | ModelProfile
+  /**
+   * Inline tool-call dialects to attempt when the model emits tool calls as TEXT
+   * instead of native function-calls (e.g. ['hermes','json-fence','xml-function']).
+   * Overrides the profile's dialects. Set `[]` to disable inline recovery.
+   */
+  toolDialects?: string[]
 }
 
 /**
@@ -41,20 +56,27 @@ export function createOpenAIClient(options: OpenAIClientOptions = {}): LLMClient
   return {
     async streamChat(messages, opts): Promise<StreamResult> {
       const model = opts.model || defaultModel
+      // Resolve a model profile (explicit > auto-detect from model id). It only
+      // fills gaps — any option set explicitly on the client always wins.
+      const profile = profileForModel(options.profile ?? model)
+      const dialects = options.toolDialects ?? profile.dialects
+      const temperature = options.temperature ?? profile.temperature
+      const parallel = options.parallelToolCalls ?? profile.parallelToolCalls
+
       const body: Record<string, unknown> = {
         model,
         messages: messages.map(toOpenAIMessage),
         stream: true,
         stream_options: { include_usage: true },
       }
-      if (options.temperature !== undefined) body.temperature = options.temperature
+      if (temperature !== undefined) body.temperature = temperature
       if (options.maxTokens !== undefined) body.max_tokens = options.maxTokens
       // Reasoning models (e.g. xAI grok-4.x): 'none' → 0 reasoning tokens (cheaper/faster).
       if (options.reasoningEffort) body.reasoning_effort = options.reasoningEffort
       if (opts.tools?.length) {
         body.tools = opts.tools
-        body.tool_choice = 'auto'
-        if (options.parallelToolCalls !== undefined) body.parallel_tool_calls = options.parallelToolCalls
+        body.tool_choice = profile.toolChoice ?? 'auto'
+        if (parallel !== undefined) body.parallel_tool_calls = parallel
       }
 
       const apiKey = typeof options.apiKey === 'function' ? options.apiKey() : options.apiKey
@@ -127,10 +149,11 @@ export function createOpenAIClient(options: OpenAIClientOptions = {}): LLMClient
         }))
 
       // Fallback: some endpoints emit tool calls as inline text rather than
-      // native tool_calls. Parse them out and clean the visible text.
+      // native tool_calls. Parse them with the profile's dialects and clean the
+      // visible text. (Empty `dialects` — e.g. for native GPT/Claude — skips this.)
       let finalText = text
-      if (!toolCalls.length) {
-        const inline = parseInlineToolCalls(text)
+      if (!toolCalls.length && (!dialects || dialects.length)) {
+        const inline = parseToolCalls(text, { dialects })
         if (inline.calls.length) {
           toolCalls.push(...inline.calls)
           finalText = inline.cleanedText

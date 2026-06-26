@@ -61,6 +61,7 @@ import { defaultSystemPrompt, defaultSubagentPrompt } from './prompt.js'
 import { DEFAULT_MAX_RESULT_CHARS, maybePersistLargeResult } from './persist.js'
 import { computeCostUSD, contextWindowFor } from './util/pricing.js'
 import { estimateTokens, summarizeHistory } from './compact.js'
+import { validateToolArguments } from './llm/repair.js'
 import { uuid } from './util/ids.js'
 
 /** Wrap a single text prompt into the async-iterable form runAgent expects. */
@@ -120,6 +121,11 @@ export interface AgentOptions {
   clientWorkspaceTools?: boolean
   /** Results for client-tool calls, injected into the transcript before continuing. */
   clientToolResults?: Array<{ tool_use_id: string; content: string | ContentBlockParam[]; is_error?: boolean }>
+  /** Validate tool arguments before executing; on malformed/incomplete JSON,
+   *  return a corrective `is_error` tool_result (with the expected schema) so the
+   *  model self-heals instead of running with garbage. Default `true`. The single
+   *  biggest reliability win for weak/cheap models. See `anyclaude-sdk/llm` repair. */
+  repairToolCalls?: boolean
   cwd?: string
   sessionId?: string
   abortController?: AbortController
@@ -380,6 +386,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
     : undefined
   const messageQueue = options.messageQueue
   const clientTools = new Set<string>(options.clientTools ?? [])
+  const repairToolCalls = options.repairToolCalls !== false
 
   // Teammates: a shared Mailbox + TaskBoard (reused from the parent when this
   // is a sub-agent) + team tools + coordinator prompt.
@@ -904,7 +911,19 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
         let isError = false
         let extraContext = ''
 
-        if (!tool || !tool.run) {
+        // Repair: validate args against the tool schema before running a server
+        // tool; on malformed/incomplete JSON, return a corrective tool_result so
+        // the model retries with valid JSON instead of executing with garbage.
+        const repairCheck =
+          repairToolCalls && tool && tool.run
+            ? validateToolArguments(tool.def, call.function.arguments)
+            : null
+        if (repairCheck && repairCheck.ok) input = repairCheck.input
+
+        if (repairCheck && !repairCheck.ok) {
+          content = repairCheck.error!
+          isError = true
+        } else if (!tool || !tool.run) {
           // Unknown, or a run-less (client-delegated) tool that somehow reached
           // server execution — both are errors here (delegated tools are handled
           // above via clientTools).

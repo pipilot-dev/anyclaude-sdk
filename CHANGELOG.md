@@ -8,6 +8,13 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.5.0
+- **Reliable tool use on cheap/open models** — three layers so the same agent loop works beyond GPT/Claude (Qwen, DeepSeek, Kimi, GLM, Mistral, Llama/Ollama), exported from `anyclaude-sdk/llm`:
+  - **Tool-call dialects** (`parseToolCalls`, `hasToolCalls`, `dialects`): recover tool calls a model emitted as TEXT — `xml-function`, `hermes` (`<tool_call>{json}</tool_call>`), and `json-fence` (```json blocks). Conservative detection won't misread ordinary JSON output. `parseInlineToolCalls` now spans all three (back-compat).
+  - **Model profiles** (`profileForModel`, `builtinProfiles`, `toolGuidancePrompt`): auto-detected per-model defaults for dialects, `tool_choice`, `parallel_tool_calls`, and temperature. `createOpenAIClient` gains `profile` + `toolDialects` options (explicit options always win; auto-detects from the model id when omitted).
+  - **Self-healing argument repair** (`validateToolArguments`, `query({ repairToolCalls })`, default on): validate tool args against the schema before executing; on malformed/incomplete JSON, return a corrective `is_error` tool_result (naming the problem + expected schema) so the model retries instead of running with garbage. Wired into both `query()` and `runToolLoop({ repairToolCalls })`.
+- **Compatibility-matrix harness** (`scripts/compat-matrix.mjs` + `compat.config.example.json`): run the real loop against any list of endpoints and print a native-vs-with-anyclaude pass/fail table. CI-runnable; keys via `env:NAME`.
+
 ### 0.4.9
 - `anyclaude-sdk/llm` now exports the canonical OpenAI wire mappers — `toOpenAIMessages(msgs)` / `toOpenAIMessage(msg)`, `blocksToOpenAIContent`, `blocksToText`, and the `OpenAIChatMessage` type. Custom `LLMClient` authors who bring their own transport (proxy / encryption / alternate URL) can reuse the SDK's exact `ChatMsg → /chat/completions` conversion (text / image / PDF `document` / `tool_result`) instead of forking it and drifting.
 - `anyclaude-sdk/llm` now re-exports the LLM client types (`LLMClient`, `ChatMsg`, `StreamResult`, `ToolCall`, `ToolDef`, `StopReason`, `Usage`, `ContentBlockParam`) as type-only — so custom-client authors get full typing from the browser-clean subpath without importing the bare root (which pulls `node:child_process` + comlink into a browser bundle).

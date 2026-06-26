@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy to compat.config.json and edit. Run: npm run build && node scripts/compat-matrix.mjs ./compat.config.json. apiKey supports 'env:NAME' to read from the environment (keys never live in this file).",
+  "endpoints": [
+    { "label": "GPT-4o", "baseUrl": "https://api.openai.com/v1", "model": "gpt-4o", "apiKey": "env:OPENAI_API_KEY" },
+    { "label": "Claude Sonnet", "baseUrl": "https://api.anthropic.com/v1", "model": "claude-sonnet-4-6", "apiKey": "env:ANTHROPIC_API_KEY" },
+    { "label": "DeepSeek", "baseUrl": "https://api.deepseek.com/v1", "model": "deepseek-chat", "apiKey": "env:DEEPSEEK_API_KEY" },
+    { "label": "Qwen (Ollama)", "baseUrl": "http://localhost:11434/v1", "model": "qwen2.5-coder:7b" },
+    { "label": "GLM (Z.AI)", "baseUrl": "https://api.z.ai/api/paas/v4", "model": "glm-4", "apiKey": "env:ZAI_API_KEY" },
+    { "label": "Kimi (Moonshot)", "baseUrl": "https://api.moonshot.cn/v1", "model": "kimi-k2", "apiKey": "env:MOONSHOT_API_KEY" }
+  ]
+}
