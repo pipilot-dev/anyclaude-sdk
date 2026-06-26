@@ -81,3 +81,30 @@ export async function summarizeHistory(
   if (!summary) return null
   return [history[0], { role: 'user', content: `Summary of the conversation so far:\n${summary}` }]
 }
+
+/**
+ * Window-aware compaction: keep the most recent `keepRecent` messages VERBATIM
+ * and summarize only the older prefix into one summary message. Far less lossy
+ * than `summarizeHistory` (which collapses the entire transcript) — recent turns
+ * stay intact while old context is condensed. Returns a new history, or the
+ * original array unchanged if there isn't enough to compact.
+ *
+ *   if (estimateTokens(history) > limit) history = await compactWithWindow(history, llm, { keepRecent: 8 })
+ */
+export async function compactWithWindow(
+  history: ChatMsg[],
+  llm: SummarizerLLM,
+  opts: { keepRecent?: number; model?: string; signal?: AbortSignal; focus?: string } = {}
+): Promise<ChatMsg[]> {
+  const keepRecent = Math.max(2, opts.keepRecent ?? 8)
+  if (history.length <= keepRecent + 2) return history
+  // Cut boundary for the verbatim window; don't start it on an orphan tool
+  // result (pull its preceding assistant turn into the window).
+  let cut = history.length - keepRecent
+  while (cut > 1 && history[cut]?.role === 'tool') cut--
+  const older = history.slice(0, cut) // includes the system message at [0]
+  const recent = history.slice(cut)
+  const summarized = await summarizeHistory(older, llm, opts)
+  if (!summarized) return history
+  return [summarized[0], summarized[1], ...recent]
+}

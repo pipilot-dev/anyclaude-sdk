@@ -37,5 +37,5 @@ export { enterPlanMode, exitPlanMode, PLAN_MODE_TOOLS } from './tools/plan_mode.
 export { uuid } from './util/ids.js'
 export * as paths from './util/paths.js'
 export { priceFor, computeCostUSD, contextWindowFor, type Pricing } from './util/pricing.js'
-export { estimateTokens, summarizeHistory } from './compact.js'
+export { estimateTokens, summarizeHistory, compactWithWindow } from './compact.js'
 // (createResponsesClient is exported via ./llm/index.js)
