@@ -36,12 +36,11 @@ export type { AgentChatProps } from './components/AgentChat.js'
 export { ChatPanel } from './components/ChatPanel.js'
 export type { ChatPanelProps } from './components/ChatPanel.js'
 
-// IDE-grade components (optional peer deps: @xterm/*, @codemirror/*)
-export { Terminal } from './components/Terminal.js'
-export type { TerminalProps, ShellProcess } from './components/Terminal.js'
 export { FileExplorer } from './components/FileExplorer.js'
 export type { FileExplorerProps, FileEntry } from './components/FileExplorer.js'
-export { CodeEditor } from './components/CodeEditor.js'
-export type { CodeEditorProps } from './components/CodeEditor.js'
 export { AskUser } from './components/AskUser.js'
 export type { AskUserProps, AskUserQuestion } from './components/AskUser.js'
+
+// Heavy IDE components (Terminal → @xterm/*, CodeEditor → codemirror) live on a
+// subpath so this root barrel stays dependency-light:
+//   import { Terminal, CodeEditor } from 'anyclaude-react/ide'

@@ -4,15 +4,8 @@ import { WebContainerWorkspace } from 'anyclaude-sdk/workspace'
 import { query } from 'anyclaude-sdk/query'
 import { createOpenAIClient } from 'anyclaude-sdk/llm'
 import type { SDKMessage } from 'anyclaude-sdk'
-import {
-  ChatPanel,
-  Terminal,
-  FileExplorer,
-  CodeEditor,
-  AskUser,
-  type AskUserQuestion,
-  type ShellProcess,
-} from 'anyclaude-react'
+import { ChatPanel, FileExplorer, AskUser, type AskUserQuestion } from 'anyclaude-react'
+import { Terminal, CodeEditor, type ShellProcess } from 'anyclaude-react/ide'
 
 const CWD = '/home/projects'
 const WC_PROMPT = `Environment: a browser WebContainer. The bash tool runs a real \`jsh\` POSIX-ish shell with Node.js + npm available, but NO Python. Build and run things with node/npm (e.g. \`node app.js\`), never python. The working directory is ${CWD}.`

@@ -15,7 +15,7 @@
     "@webcontainer/api": "^1.5.1",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/xterm": "^5.5.0",
-    "anyclaude-react": "^0.2.1",
+    "anyclaude-react": "^0.4.0",
     "anyclaude-sdk": "^0.4.1",
     "codemirror": "^6.0.1",
     "react": "^18.3.1",

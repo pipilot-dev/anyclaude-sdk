@@ -4,7 +4,8 @@ import { query } from 'anyclaude-sdk/query'
 import { createOpenAIClient } from 'anyclaude-sdk/llm'
 import { DexieFileSystem } from 'anyclaude-sdk/fs'
 import type { SDKMessage } from 'anyclaude-sdk'
-import { ChatPanel, FileExplorer, CodeEditor } from 'anyclaude-react'
+import { ChatPanel, FileExplorer } from 'anyclaude-react'
+import { CodeEditor } from 'anyclaude-react/ide'
 
 // The agent's built-in file tools execute against THIS IndexedDB database.
 // Change the name to switch "location"; `new DexieFileSystem(name, { db })` can

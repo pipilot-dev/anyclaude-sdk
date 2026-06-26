@@ -87,14 +87,25 @@ You can still hand-write a `clientTools` map (`{ bash: async ({command}) => ({ c
 | `<Composer onSend>` | Textarea + send (Enter sends, Shift+Enter newline). |
 | `<Working active paused>` | Shimmering "Working…" indicator. |
 
-**IDE** (optional peers: `@xterm/xterm`, `codemirror`)
+**Lightweight UI (root, no heavy deps)**
 
 | Component | Purpose |
 |---|---|
-| `<Terminal spawn>` | xterm.js bound to a streaming shell (e.g. a WebContainer process). |
 | `<FileExplorer list onOpen>` | Collapsible file tree over any filesystem adapter. |
-| `<CodeEditor value onChange>` | Controlled CodeMirror 6 editor. |
 | `<AskUser question onAnswer>` | Renders an `ask_user_question` prompt; pair with the SDK's `onAskUser`. |
+
+**IDE — `anyclaude-react/ide` subpath** (so the root barrel stays dependency-light)
+
+```tsx
+import { Terminal, CodeEditor } from 'anyclaude-react/ide'
+```
+
+| Component | Purpose | Peer dep |
+|---|---|---|
+| `<Terminal spawn>` | xterm.js terminal bound to a streaming shell (e.g. a WebContainer process). | `@xterm/xterm` + `@xterm/addon-fit` |
+| `<CodeEditor value onChange>` | Controlled CodeMirror 6 editor. | `codemirror` + `@codemirror/*` |
+
+The root export (`useAgent`, chat components, `FileExplorer`, `AskUser`, the client/workspace helpers) pulls **neither** `@xterm` nor `codemirror` — install those only if you import from `/ide`.
 
 ## Styling
 

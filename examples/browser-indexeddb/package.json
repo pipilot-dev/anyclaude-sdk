@@ -7,7 +7,7 @@
   "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview" },
   "dependencies": {
     "anyclaude-sdk": "^0.4.4",
-    "anyclaude-react": "^0.3.0",
+    "anyclaude-react": "^0.4.0",
     "dexie": "^4.0.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

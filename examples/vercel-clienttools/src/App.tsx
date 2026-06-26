@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { WebContainer } from '@webcontainer/api'
-import { ChatPanel, Terminal, FileExplorer, CodeEditor, createWebContainerClientTools, type ShellProcess } from 'anyclaude-react'
+import { ChatPanel, FileExplorer, createWebContainerClientTools } from 'anyclaude-react'
+import { Terminal, CodeEditor, type ShellProcess } from 'anyclaude-react/ide'
 
 const CWD = '/home/work'
 
