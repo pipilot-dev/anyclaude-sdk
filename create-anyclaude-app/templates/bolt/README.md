@@ -11,10 +11,10 @@ Open the app, set an **LLM endpoint + model + API key** in the top bar, then ask
 
 ## How it works
 
-- `WebContainer.boot()` + a tiny zero-dependency Node static server (`src/starter.ts`) give an instant dev server (no `npm install` wait).
+- `WebContainer.boot()` mounts a real **Vite + React** starter (`src/starter.ts`); the IDE runs `npm install` then `npm run dev` and Vite hot-reloads the preview as files change.
 - The agent runs **in the browser** via `query()` from `anyclaude-sdk/query`, against a `WebContainerWorkspace` — so its `bash` / file tools operate on the real container.
-- `useWebContainerPreview({ wc })` (from `anyclaude-react`) boots the dev server, waits for the container's `server-ready` event, and hands back the forwarded URL for the `<iframe>`.
-- `<ChatPanel run={…} />` renders the conversation.
+- `useWebContainerPreview({ wc })` (from `anyclaude-react`) starts the dev server, waits for the container's `server-ready` event, and hands back the forwarded URL for the `<iframe>`.
+- The full IDE: `<ChatPanel>` (chat), `<FileExplorer>` + `<CodeEditor>` (browse/edit, writes straight back to the container), and `<Terminal>` (a live `jsh` shell) — all from `anyclaude-react` / `anyclaude-react/ide`.
 
 ## Important: the LLM endpoint must allow CORS
 
@@ -26,6 +26,6 @@ WebContainer requires COOP/COEP headers. `vite.config.ts` sets them for dev; set
 
 ## Make it your own
 
-- Swap the starter for a Vite/Next project in `src/starter.ts` (expect an `npm install` wait; point the preview hook's `command`/`args` at your dev script).
-- Add the IDE panels: `import { Terminal, CodeEditor } from 'anyclaude-react/ide'` and `FileExplorer` from `anyclaude-react`.
-- Delegate file/bash tools to the container explicitly with `createWebContainerClientTools(wc)` if you move the loop server-side.
+- Swap the Vite starter in `src/starter.ts` for any framework (Next, SvelteKit, …); point the preview hook's `command`/`args` at its dev script. For an instant, install-free preview, use a zero-dependency Node static server instead.
+- The IDE panels come from `anyclaude-react` (`ChatPanel`, `FileExplorer`) and `anyclaude-react/ide` (`Terminal`, `CodeEditor`) — rearrange or restyle freely; everything is restylable via `styles.css`.
+- To move the agent loop server-side (for non-CORS / key-protected models), delegate file/bash tools back to the container with `createWebContainerClientTools(wc)` + `useAgent({ endpoint, clientTools })`.

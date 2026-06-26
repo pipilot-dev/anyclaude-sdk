@@ -12,6 +12,12 @@
     "anyclaude-sdk": "^0.6.0",
     "anyclaude-react": "^0.5.0",
     "@webcontainer/api": "^1.5.0",
+    "@xterm/xterm": "^5.5.0",
+    "@xterm/addon-fit": "^0.10.0",
+    "@codemirror/view": "^6.30.0",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/commands": "^6.6.0",
+    "@codemirror/lang-javascript": "^6.2.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

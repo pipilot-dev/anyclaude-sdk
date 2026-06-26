@@ -1,6 +1,7 @@
-// The starter project mounted into the WebContainer. Deliberately zero-dependency
-// (a tiny Node static server) so the dev server is ready instantly — no `npm
-// install` wait. The agent edits index.html; click Refresh to see changes.
+// The starter project mounted into the WebContainer — a real Vite + React app.
+// The IDE runs `npm install` then `npm run dev`; the agent edits these files and
+// Vite hot-reloads the preview. (For an instant, install-free preview, swap this
+// for a zero-dependency Node static server and adjust the dev script.)
 import type { FileSystemTree } from '@webcontainer/api'
 
 export const starterFiles: FileSystemTree = {
@@ -9,34 +10,22 @@ export const starterFiles: FileSystemTree = {
       contents: JSON.stringify(
         {
           name: 'app',
+          private: true,
           type: 'module',
-          scripts: { dev: 'node server.js' },
+          scripts: { dev: 'vite --port 3000' },
+          dependencies: { react: '^18.3.1', 'react-dom': '^18.3.1' },
+          devDependencies: { '@vitejs/plugin-react': '^4.3.1', vite: '^5.4.0' },
         },
         null,
         2
       ),
     },
   },
-  'server.js': {
+  'vite.config.js': {
     file: {
-      contents: `import http from 'node:http'
-import { readFile } from 'node:fs/promises'
-import { extname } from 'node:path'
-
-const types = { '.html':'text/html', '.css':'text/css', '.js':'text/javascript', '.json':'application/json', '.svg':'image/svg+xml' }
-
-http.createServer(async (req, res) => {
-  let path = decodeURIComponent((req.url || '/').split('?')[0])
-  if (path === '/' ) path = '/index.html'
-  try {
-    const body = await readFile('.' + path)
-    res.writeHead(200, { 'content-type': types[extname(path)] || 'application/octet-stream' })
-    res.end(body)
-  } catch {
-    res.writeHead(404, { 'content-type': 'text/html' })
-    res.end('<h1>404</h1><p>' + path + ' not found</p>')
-  }
-}).listen(3000, () => console.log('dev server on :3000'))
+      contents: `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+export default defineConfig({ plugins: [react()], server: { host: true } })
 `,
     },
   },
@@ -45,12 +34,37 @@ http.createServer(async (req, res) => {
       contents: `<!doctype html>
 <html>
   <head><meta charset="utf-8" /><title>App</title></head>
-  <body style="font-family: system-ui; max-width: 640px; margin: 4rem auto; padding: 0 1rem">
-    <h1>Your app starts here</h1>
-    <p>Ask the agent to build something — it edits these files in a real shell, in your browser tab. Then hit <b>Refresh preview</b>.</p>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
 `,
+    },
+  },
+  src: {
+    directory: {
+      'main.jsx': {
+        file: {
+          contents: `import { createRoot } from 'react-dom/client'
+import App from './App.jsx'
+createRoot(document.getElementById('root')).render(<App />)
+`,
+        },
+      },
+      'App.jsx': {
+        file: {
+          contents: `export default function App() {
+  return (
+    <main style={{ fontFamily: 'system-ui', maxWidth: 640, margin: '4rem auto', padding: '0 1rem' }}>
+      <h1>Your app starts here</h1>
+      <p>Ask the agent to build something. It edits these files in a real shell, in your browser tab, and Vite hot-reloads this preview.</p>
+    </main>
+  )
+}
+`,
+        },
+      },
     },
   },
 }
