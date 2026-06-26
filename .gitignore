@@ -36,3 +36,6 @@ MEMORY.md
 
 # Vercel CLI link/config
 .vercel
+
+# Local-only endpoint swap tool (keeps the3rdacademy off GitHub)
+scripts/swap-llm-endpoint.mjs
