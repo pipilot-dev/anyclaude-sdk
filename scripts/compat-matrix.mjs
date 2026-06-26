@@ -31,7 +31,7 @@
 // `apiKey` accepts "env:NAME" to read from the environment (keys never live in
 // the config file). Output is markdown on stdout — pipe to a file or a docs page.
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 
 const { runToolLoop } = await import('../dist/loop.js')
 const { createOpenAIClient } = await import('../dist/llm/openai.js')
@@ -110,48 +110,77 @@ function mark(b) {
   return 'fail'
 }
 
+function flagValue(name) {
+  const i = process.argv.indexOf(name)
+  return i >= 0 ? process.argv[i + 1] : undefined
+}
+
 async function main() {
-  const arg = process.argv[2]
-  if (arg === '--demo' || (!arg && !process.env.COMPAT_CONFIG)) {
-    return demo()
+  const out = flagValue('--out')
+  const positional = process.argv.slice(2).find((a) => !a.startsWith('--'))
+  const wantDemo = process.argv.includes('--demo') || (!positional && !process.env.COMPAT_CONFIG)
+
+  let markdown
+  if (wantDemo) {
+    markdown = demoMarkdown()
+  } else {
+    const path = positional || process.env.COMPAT_CONFIG
+    const cfg = JSON.parse(readFileSync(path, 'utf8'))
+    const rows = []
+    for (const ep of cfg.endpoints) {
+      process.stderr.write(`• ${ep.label} (${ep.model}) … `)
+      const native = await runBattery(ep, { native: true })
+      const full = await runBattery(ep, { native: false })
+      const prof = profileForModel(ep.profile ?? ep.model)
+      rows.push({ ep, native, full, prof })
+      process.stderr.write(`native=${mark(native)} | anyclaude=${mark(full)}\n`)
+    }
+    markdown = buildMarkdown(rows)
   }
-  const path = arg && !arg.startsWith('--') ? arg : process.env.COMPAT_CONFIG
-  const cfg = JSON.parse(readFileSync(path, 'utf8'))
-  const rows = []
-  for (const ep of cfg.endpoints) {
-    process.stderr.write(`• ${ep.label} (${ep.model}) … `)
-    const native = await runBattery(ep, { native: true })
-    const full = await runBattery(ep, { native: false })
-    const prof = profileForModel(ep.profile ?? ep.model)
-    rows.push({ ep, native, full, prof })
-    process.stderr.write(`native=${mark(native)} | anyclaude=${mark(full)}\n`)
+
+  console.log(markdown)
+  if (out) {
+    writeFileSync(out, markdown.endsWith('\n') ? markdown : markdown + '\n')
+    process.stderr.write(`\nWrote ${out}\n`)
   }
-  printMarkdown(rows)
 }
 
-function printMarkdown(rows) {
+function buildMarkdown(rows) {
   const date = new Date().toISOString().slice(0, 10)
-  console.log(`## anyclaude-sdk tool-use compatibility matrix\n`)
-  console.log(`_Generated ${date} by \`scripts/compat-matrix.mjs\`. Task: call \`add(17,25)\` then answer \`42\`._\n`)
-  console.log(`| Model | Endpoint | Native tool-calls | With anyclaude (dialects + repair) | Profile | Latency |`)
-  console.log(`|---|---|---|---|---|---|`)
+  const lines = [
+    `# anyclaude-sdk tool-use compatibility matrix`,
+    ``,
+    `_Generated ${date} by \`scripts/compat-matrix.mjs\`. Task: call \`add(17,25)\` then answer \`42\`._`,
+    ``,
+    `| Model | Endpoint | Native tool-calls | With anyclaude (dialects + repair) | Profile | Latency |`,
+    `|---|---|---|---|---|---|`,
+  ]
   for (const { ep, native, full, prof } of rows) {
-    console.log(
-      `| ${ep.label} | \`${ep.model}\` | ${mark(native)} | ${mark(full)} | \`${prof.name}\` | ${native.ms + full.ms}ms |`
-    )
+    lines.push(`| ${ep.label} | \`${ep.model}\` | ${mark(native)} | ${mark(full)} | \`${prof.name}\` | ${native.ms + full.ms}ms |`)
   }
-  console.log(`\n> "With anyclaude" turns failing-native models green via inline dialect recovery + self-healing argument repair. Errors usually mean a bad key, an unreachable baseUrl, or no tool support at all.`)
+  lines.push(``)
+  lines.push(`> "With anyclaude" turns failing-native models green via inline dialect recovery + self-healing argument repair. Errors usually mean a bad key, an unreachable baseUrl, or no tool support at all.`)
+  return lines.join('\n')
 }
 
-function demo() {
-  console.log('Offline self-check (no network). Verifies dialect parsing + repair deterministically.\n')
-  console.log('Run with a config to test live endpoints:')
-  console.log('  node scripts/compat-matrix.mjs ./compat.config.json\n')
-  console.log('Built-in model profiles:')
+function demoMarkdown() {
+  const lines = [
+    `# anyclaude-sdk tool-use compatibility matrix`,
+    ``,
+    `> Offline self-check (no network). Live results require provider endpoints + keys —`,
+    `> run \`node scripts/compat-matrix.mjs ./compat.config.json\` (keys via \`env:NAME\`), or`,
+    `> set the \`COMPAT_CONFIG_JSON\` + provider-key secrets in the CI workflow.`,
+    ``,
+    `Built-in model profiles (which dialects each is tried with):`,
+    ``,
+    `| Model id | Profile | Inline dialects |`,
+    `|---|---|---|`,
+  ]
   for (const m of ['gpt-4o', 'claude-sonnet-4-6', 'qwen2.5-coder:7b', 'deepseek-chat', 'kimi-k2', 'glm-4', 'mistral-large', 'llama3.1:70b', 'unknown-model']) {
     const p = profileForModel(m)
-    console.log(`  ${m.padEnd(22)} → ${p.name.padEnd(10)} dialects=[${(p.dialects ?? []).join(',')}]`)
+    lines.push(`| \`${m}\` | \`${p.name}\` | ${(p.dialects ?? []).length ? (p.dialects).join(', ') : '_(native)_'} |`)
   }
+  return lines.join('\n')
 }
 
 main().catch((e) => {

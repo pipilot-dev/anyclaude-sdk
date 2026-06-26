@@ -122,7 +122,7 @@ including it. Expected: { path: string (required), content: string (required) }<
       <p>Don't take our word for it — the repo ships a harness that runs the real loop against any models you list and prints a pass/fail matrix (native vs. with-anyclaude):</p>
       <div class="code"><pre><code class="language-bash">npm run build
 node scripts/compat-matrix.mjs ./compat.config.json   # your endpoints; keys via env:NAME</code></pre></div>
-      <p>It scores each model on "called the tool <i>and</i> used the result." Models that fail native often pass once dialects + repair are on — that delta is the point.</p>
+      <p>It scores each model on "called the tool <i>and</i> used the result." Models that fail native often pass once dialects + repair are on — that delta is the point. A GitHub Action regenerates the table on a schedule; current results live in <a href="https://github.com/pipilot-dev/anyclaude-sdk/blob/main/COMPATIBILITY.md">COMPATIBILITY.md</a>.</p>
     </section>
 
     <section id="clients">

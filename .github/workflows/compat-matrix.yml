@@ -1,0 +1,68 @@
+name: Compatibility matrix
+
+# Regenerates COMPATIBILITY.md — the tool-use pass/fail table for the models
+# people route to. Manual (workflow_dispatch) or weekly. Runs an offline
+# self-check by default; set the COMPAT_CONFIG_JSON secret (a config listing
+# endpoints, keys via env:NAME) + the provider-key secrets to test live models.
+
+on:
+  workflow_dispatch:
+    inputs:
+      live:
+        description: 'Run live (requires COMPAT_CONFIG_JSON + provider-key secrets)'
+        type: boolean
+        default: false
+  schedule:
+    - cron: '17 6 * * 1' # Mondays 06:17 UTC
+
+permissions:
+  contents: write
+
+concurrency:
+  group: compat-matrix
+  cancel-in-progress: true
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run build
+
+      - name: Generate matrix
+        env:
+          # Provider keys referenced by the config via "env:NAME". Add the ones
+          # your config uses as repo secrets; unset ones simply show as errors.
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ZAI_API_KEY: ${{ secrets.ZAI_API_KEY }}
+          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          COMPAT_CONFIG_JSON: ${{ secrets.COMPAT_CONFIG_JSON }}
+          LIVE: ${{ inputs.live }}
+        run: |
+          if [ "$LIVE" = "true" ] && [ -n "$COMPAT_CONFIG_JSON" ]; then
+            printf '%s' "$COMPAT_CONFIG_JSON" > compat.ci.config.json
+            node scripts/compat-matrix.mjs compat.ci.config.json --out COMPATIBILITY.md
+            rm -f compat.ci.config.json
+          else
+            echo "No live config (or live not requested) — writing offline self-check."
+            node scripts/compat-matrix.mjs --demo --out COMPATIBILITY.md
+          fi
+
+      - name: Commit if changed
+        run: |
+          if ! git diff --quiet -- COMPATIBILITY.md; then
+            git config user.name "Hans Ade"
+            git config user.email "anye.happiness@swisslinkedu.com"
+            git add COMPATIBILITY.md
+            git commit -m "chore: regenerate tool-use compatibility matrix"
+            git push
+          else
+            echo "COMPATIBILITY.md unchanged."
+          fi
