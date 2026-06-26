@@ -1,0 +1,33 @@
+{
+  "name": "create-anyclaude-app",
+  "version": "0.1.0",
+  "description": "Scaffold an anyclaude-sdk app — including 'bolt', an in-browser AI IDE (WebContainer + chat + live preview).",
+  "type": "module",
+  "bin": {
+    "create-anyclaude-app": "index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "anyclaude-sdk",
+    "create",
+    "scaffold",
+    "webcontainer",
+    "ai-ide",
+    "bolt",
+    "agent"
+  ],
+  "license": "MIT",
+  "author": "Hans Ade <anye.happiness@swisslinkedu.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/pipilot-dev/anyclaude-sdk.git",
+    "directory": "create-anyclaude-app"
+  },
+  "homepage": "https://github.com/pipilot-dev/anyclaude-sdk/tree/main/create-anyclaude-app#readme"
+}

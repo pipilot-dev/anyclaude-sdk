@@ -111,6 +111,22 @@ const wc = await WebContainer.boot()
 &lt;FileExplorer list={(d) =&gt; wc.fs.readdir(d, { withFileTypes: true }).then(es =&gt; es.map(e =&gt; ({ name: e.name, isDir: e.isDirectory() })))} root="/home/projects" onOpen={open} /&gt;
 &lt;CodeEditor value={code} onChange={setCode} /&gt;</code></pre></div>
       <p>See the <a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/browser-ide">browser-ide example</a> for the full wiring (real <code>jsh</code> shell + Node, no backend).</p>
+
+      <h3 id="preview"><code>useWebContainerPreview()</code> — live preview <span class="pill">0.5.0</span></h3>
+      <p>The fiddly part of an in-browser IDE: boot a dev server inside a WebContainer and get back a live preview URL. The hook spawns the command, waits for the container's <code>server-ready</code> event, streams logs, and cleans up on unmount.</p>
+      <div class="code"><pre><code class="language-tsx">import { useWebContainerPreview } from 'anyclaude-react'
+
+const { url, status, logs, restart } = useWebContainerPreview({ wc, autoStart: true })
+//   command='npm', args=['run','dev'] by default; pass spawnOptions={{ cwd, env }}
+return url ? &lt;iframe src={url} /&gt; : &lt;pre&gt;{logs || status}&lt;/pre&gt;</code></pre></div>
+    </section>
+
+    <section id="scaffold">
+      <h2><i data-lucide="rocket"></i> Scaffold a bolt clone in one command <span class="pill">new</span></h2>
+      <p><code>create-anyclaude-app</code> spins up a ready-to-run in-browser AI IDE — WebContainer + chat + live preview, wired with <code>useWebContainerPreview</code> and a browser-side <code>query()</code>. No backend.</p>
+      <div class="code"><pre><code class="language-bash">npm create anyclaude-app@latest my-app   # template: bolt
+cd my-app &amp;&amp; npm install &amp;&amp; npm run dev</code></pre></div>
+      <p>Set a CORS-enabled LLM endpoint + model + key in the UI, then ask it to build something — it edits files in a real shell in the tab, and the preview updates. (For non-CORS / key-protected models, move the loop server-side — see <a href="deploy.html">Deploy</a>.)</p>
     </section>
 
     <section id="askuser">

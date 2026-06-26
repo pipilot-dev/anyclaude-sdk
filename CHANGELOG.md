@@ -88,6 +88,10 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-react
 
+### 0.5.0
+- **`useWebContainerPreview({ wc })`** — boot a dev server inside a WebContainer and get back a live preview URL for an `<iframe>` (waits for the container's `server-ready` event), with streamed logs, status, and `start`/`stop`/`restart`. The fiddly core of building an in-browser AI IDE, packaged as a hook. Structurally typed against `@webcontainer/api` (no hard peer dep).
+- Internal: guard the now-optional `Tool.run` in `createWorkspaceClientTools` (SDK 0.4.8 made `run` optional).
+
 ### 0.4.0
 - Moved `Terminal` + `CodeEditor` to the `anyclaude-react/ide` subpath so the root barrel no longer pulls `@xterm/*` or `codemirror` into the module graph — chat-only consumers no longer need those peers installed. **BREAKING:** import `Terminal`/`CodeEditor` from `anyclaude-react/ide` instead of the root. `FileExplorer` + `AskUser` remain in the root (no heavy deps).
 

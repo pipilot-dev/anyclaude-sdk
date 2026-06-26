@@ -19,6 +19,15 @@ export type {
 export { useAgent } from './useAgent.js'
 export type { UseAgentOptions, UseAgentResult, AgentStatus } from './useAgent.js'
 
+export { useWebContainerPreview } from './useWebContainerPreview.js'
+export type {
+  WebContainerLike,
+  WebContainerProcessLike,
+  PreviewStatus,
+  UseWebContainerPreviewOptions,
+  UseWebContainerPreviewResult,
+} from './useWebContainerPreview.js'
+
 export { renderMarkdown } from './markdown.js'
 
 export { Message, MarkdownMessage } from './components/Message.js'

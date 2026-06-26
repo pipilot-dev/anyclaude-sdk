@@ -81,8 +81,10 @@ export function createWorkspaceClientTools(
     const name = t.def.function.name
     if (opts.only && !opts.only.includes(name)) continue
     if (name === 'bash' && !hasExec) continue
+    if (!t.run) continue // built-in workspace tools always have a run; guards the now-optional type
+    const run = t.run
     map[name] = async (input: Record<string, unknown>) => {
-      const r: ToolResult = await t.run(input, ctx)
+      const r: ToolResult = await run(input, ctx)
       return { content: r.content as unknown, is_error: r.isError }
     }
   }

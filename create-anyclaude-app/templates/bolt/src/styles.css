@@ -1,0 +1,32 @@
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { font-family: system-ui, sans-serif; color: #1a1a1a; background: #fafafa; }
+
+.app { display: flex; flex-direction: column; height: 100vh; }
+.bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-bottom: 1px solid #e3e3e3; background: #fff;
+}
+.bar input { padding: 5px 8px; border: 1px solid #d4d4d4; border-radius: 6px; font-size: 13px; }
+.bar .muted { margin-left: auto; color: #888; font-size: 12px; }
+
+.grid { display: grid; grid-template-columns: 420px 1fr; flex: 1; min-height: 0; }
+.chat { border-right: 1px solid #e3e3e3; min-height: 0; display: flex; }
+.chat > * { flex: 1; min-height: 0; }
+.placeholder { padding: 24px; color: #888; }
+
+.preview { display: flex; flex-direction: column; min-height: 0; }
+.preview-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-bottom: 1px solid #e3e3e3; background: #fff; font-size: 13px;
+}
+.preview-bar button {
+  padding: 4px 10px; border: 1px solid #d4d4d4; border-radius: 6px;
+  background: #fff; cursor: pointer; font-size: 12px;
+}
+.preview-bar button:disabled { opacity: 0.5; cursor: default; }
+.preview iframe { flex: 1; border: 0; width: 100%; background: #fff; }
+.logs {
+  flex: 1; margin: 0; padding: 12px; overflow: auto;
+  background: #111; color: #ddd; font: 12px/1.5 ui-monospace, monospace; white-space: pre-wrap;
+}
