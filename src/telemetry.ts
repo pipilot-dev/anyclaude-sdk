@@ -17,7 +17,7 @@
 import { uuid } from './util/ids.js'
 
 /** Bump on release so adoption can be bucketed by version. */
-export const TELEMETRY_SDK_VERSION = '0.7.0'
+export const TELEMETRY_SDK_VERSION = '0.7.1'
 
 export interface TelemetryOptions {
   /** Force-disable for this call (highest precedence besides the global opt-outs). */
@@ -26,8 +26,10 @@ export interface TelemetryOptions {
   url?: string
 }
 
-// Set this (or `ANYCLAUDE_TELEMETRY_URL`) to your collector. Empty ⇒ no-op.
-const DEFAULT_TELEMETRY_URL = ''
+// Aggregate-only collector (Puter Worker; see examples/telemetry-collector).
+// Override with `ANYCLAUDE_TELEMETRY_URL` / `telemetry: { url }`, or disable
+// entirely with the opt-outs above. Set to '' to make telemetry a no-op.
+const DEFAULT_TELEMETRY_URL = 'https://anyclaude-telemetry.puter.work'
 
 // Only these prop keys are ever transmitted, and only with safe value types.
 // Booleans pass through; these specific string keys pass through as-is (they are

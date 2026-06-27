@@ -22,7 +22,7 @@ In the browser:
 localStorage.setItem('anyclaude_telemetry', '0')  // or: globalThis.__ANYCLAUDE_NO_TELEMETRY__ = true
 ```
 
-It is also a **no-op unless a collector URL is configured** (`ANYCLAUDE_TELEMETRY_URL` or `telemetry: { url }`). With no endpoint, nothing is ever sent.
+The default collector is an aggregate-only [Puter Worker](https://anyclaude-telemetry.puter.work) (source + storage model in [`examples/telemetry-collector`](./examples/telemetry-collector)). Point it elsewhere with `ANYCLAUDE_TELEMETRY_URL` / `telemetry: { url }`, or set it to empty to make telemetry a no-op.
 
 ## What is sent (one event per `query()` run)
 
@@ -53,7 +53,7 @@ Anything not in the allowlist above is dropped before the request is built.
 
 ## Where it goes
 
-To the collector **you** configure — there is no default endpoint baked in. A reference collector that keeps only aggregate counters is in [`examples/telemetry-collector`](./examples/telemetry-collector). You host it; you see counts, not people.
+To an **aggregate-only** collector at `https://anyclaude-telemetry.puter.work` (a Puter Worker — source in [`examples/telemetry-collector`](./examples/telemetry-collector)) that keeps only counters like `event:run`, `runtime:node`, `feature:survivor`, `model_family:deepseek`. It stores counts, not people, and re-validates every event against the same allowlist server-side. Point `ANYCLAUDE_TELEMETRY_URL` at your own collector (or `''`) to send elsewhere or nowhere.
 
 ## Why opt-out (not opt-in)
 

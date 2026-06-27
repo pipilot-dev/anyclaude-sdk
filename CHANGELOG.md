@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.7.1
+- Telemetry now defaults to a live aggregate-only collector (`https://anyclaude-telemetry.puter.work`, a Puter Worker — source in `examples/telemetry-collector/puter-worker.js`). All opt-outs (`ANYCLAUDE_TELEMETRY=0` / `DO_NOT_TRACK` / `CI` / `disableTelemetry` / browser localStorage) and the `ANYCLAUDE_TELEMETRY_URL` override are unchanged; set the URL to `''` to disable sending. The schema and privacy guarantees from 0.7.0 are identical.
+
 ### 0.7.0
 - **Anonymous, opt-out usage telemetry** (`anyclaude-sdk/telemetry`) — answers "are people adopting it, and which parts?" in aggregate, never per-user. One `run` event per `query()`: `sdk_version`, `runtime`, a random non-identifying `install` id, a coarse `model_family` bucket, and feature booleans. **Never** sends repo URLs, project names, paths, source, prompts, tool args, LLM responses, API keys, or endpoints — `track()` whitelists prop keys + value types and drops everything else. Off via `ANYCLAUDE_TELEMETRY=0` / `DO_NOT_TRACK=1` / any `CI` / `query({ disableTelemetry: true })` / browser `localStorage['anyclaude_telemetry']='0'`, and a **no-op unless a collector URL is configured** (`ANYCLAUDE_TELEMETRY_URL` / `telemetry: { url }`). Fire-and-forget; never blocks or throws. Full disclosure in `TELEMETRY.md`; reference collector in `examples/telemetry-collector`. Exports `track`, `telemetryEnabled`, `detectRuntime`.
 
