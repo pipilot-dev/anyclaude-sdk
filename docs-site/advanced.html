@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.6.2 · MIT</div>
+    <div class="brand-sub">v0.7.0 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
@@ -218,6 +218,20 @@ query({
 }</code></pre></div>
       <div class="card" style="border-left:3px solid var(--accent)">
         <p><i data-lucide="info"></i> Compaction is a turn-boundary operation, so it never interrupts a tool mid-flight. Treat an <b>absent</b> <code>status</code> as <code>'end'</code> (pre-0.6.2 streams only emitted the post-compaction boundary). Pair it with a persistent <a href="#sessions">session</a> for unbounded multi-turn runs.</p>
+      </div>
+    </section>
+
+    <section id="telemetry">
+      <h2>Telemetry <span class="pill">0.7.0</span></h2>
+      <p>The SDK can emit <b>anonymous, aggregate</b> usage telemetry — one <code>run</code> event per <code>query()</code> carrying only <code>sdk_version</code>, <code>runtime</code>, a random non-identifying install id, a coarse <code>model_family</code> bucket, and feature booleans. It <b>never</b> sends repo URLs, project names, paths, source, prompts, tool args, LLM responses, API keys, or endpoints — <code>track()</code> whitelists keys and value types and drops everything else.</p>
+      <p>It's <b>off with one switch</b> and a <b>no-op unless you configure a collector</b>:</p>
+      <div class="code"><pre><code class="language-bash">ANYCLAUDE_TELEMETRY=0      # or DO_NOT_TRACK=1; auto-off under CI
+ANYCLAUDE_TELEMETRY_URL=https://your-collector/   # nothing is sent without this</code></pre></div>
+      <div class="code"><pre><code class="language-ts">query({ /* … */, disableTelemetry: true })                 // off for this run
+query({ /* … */, telemetry: { url: 'https://your-collector/' } })  // or point it explicitly
+// browser opt-out: localStorage.setItem('anyclaude_telemetry','0')</code></pre></div>
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <p><i data-lucide="shield"></i> Full disclosure of every field in <a href="https://github.com/pipilot-dev/anyclaude-sdk/blob/main/TELEMETRY.md">TELEMETRY.md</a>; a reference aggregate-only collector (Cloudflare/Vercel/Deno/Puter) is in <a href="https://github.com/pipilot-dev/anyclaude-sdk/tree/main/examples/telemetry-collector">examples/telemetry-collector</a>. Opt-out, anonymous, <code>DO_NOT_TRACK</code>-aware — the same model Next.js / Astro use.</p>
       </div>
     </section>
   </main>

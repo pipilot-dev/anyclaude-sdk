@@ -19,6 +19,8 @@ import type { SlashCommand } from './commands/index.js'
 import type { SessionStoreLike } from './session/index.js'
 import type { MemoryStore } from './memory/index.js'
 import { runAgent, type Workspace } from './agent.js'
+import { track, telemetryEnabled, type TelemetryOptions } from './telemetry.js'
+import { profileForModel } from './llm/profiles.js'
 
 export interface QueryOptions {
   /** A plain string (single turn) or a stream of user messages (multi-turn). */
@@ -113,6 +115,11 @@ export interface QueryOptions {
   settings?: boolean | import('./settings/index.js').Settings
   /** Load `.claude/skills/*.md` as slash commands + a skill registry, or pass a Skill[]. */
   skills?: boolean | import('./skills/index.js').Skill[]
+  /** Anonymous, opt-out usage telemetry (version/runtime/which-features only — never
+   *  code, prompts, repo, or keys). Configure or disable via `telemetry`; see TELEMETRY.md. */
+  telemetry?: TelemetryOptions
+  /** Convenience to force telemetry off for this run (same as `telemetry: { disabled: true }`). */
+  disableTelemetry?: boolean
 }
 
 /** An async iterator of SDK messages, augmented with session controls. */
@@ -180,6 +187,35 @@ export function query(options: QueryOptions): Query {
   }) as Query
 
   gen.interrupt = () => abortController.abort()
+
+  // Anonymous, aggregate adoption signal — one event per public run. Fire-and-forget,
+  // never blocks the generator, no-ops unless enabled + a collector is configured.
+  // Only booleans + a coarse model-family bucket leave the process (see telemetry.ts).
+  const telemetry: TelemetryOptions = {
+    disabled: options.disableTelemetry,
+    ...options.telemetry,
+  }
+  if (telemetryEnabled(telemetry)) {
+    track(
+      'run',
+      {
+        model_family: profileForModel(options.model).name,
+        client_workspace_tools: !!options.clientWorkspaceTools,
+        client_tools: !!options.clientTools?.length,
+        survivor: options.maxDurationMs != null,
+        mcp: !!options.mcpServers,
+        team: !!options.team,
+        background: !!options.background,
+        auto_compact: !!options.autoCompact,
+        skills: !!options.skills,
+        sessions: !!options.sessionStore,
+        partial_messages: !!options.includePartialMessages,
+        resumed: !!options.continueRun || !!options.resume,
+      },
+      telemetry
+    )
+  }
+
   return gen
 }
 

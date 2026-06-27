@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.7.0
+- **Anonymous, opt-out usage telemetry** (`anyclaude-sdk/telemetry`) — answers "are people adopting it, and which parts?" in aggregate, never per-user. One `run` event per `query()`: `sdk_version`, `runtime`, a random non-identifying `install` id, a coarse `model_family` bucket, and feature booleans. **Never** sends repo URLs, project names, paths, source, prompts, tool args, LLM responses, API keys, or endpoints — `track()` whitelists prop keys + value types and drops everything else. Off via `ANYCLAUDE_TELEMETRY=0` / `DO_NOT_TRACK=1` / any `CI` / `query({ disableTelemetry: true })` / browser `localStorage['anyclaude_telemetry']='0'`, and a **no-op unless a collector URL is configured** (`ANYCLAUDE_TELEMETRY_URL` / `telemetry: { url }`). Fire-and-forget; never blocks or throws. Full disclosure in `TELEMETRY.md`; reference collector in `examples/telemetry-collector`. Exports `track`, `telemetryEnabled`, `detectRuntime`.
+
 ### 0.6.2
 - Auto-compaction now emits a **`compact_boundary` with `status: 'start'` BEFORE** the (possibly slow) summarization, then `status: 'end'` after — so a UI can show a live "compacting…" indicator during the work instead of only a retroactive marker. `compact_metadata` gains `status?: 'start' | 'end'` and `post_tokens?` (token estimate after compaction); `pre_tokens` on auto-compaction is now the real transcript estimate (was the threshold). `status` is absent only on pre-0.6.2 streams — treat absent as `'end'` (backward-compatible). Manual `/compact` emits a single `status: 'end'` boundary.
 

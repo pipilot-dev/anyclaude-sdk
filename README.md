@@ -390,6 +390,10 @@ Runnable Vite projects in [`examples/`](examples/): **`browser-ide`** (WebContai
 | MCP / slash commands / background tasks / sub-agents | Built-in | Built-in |
 | Serverless survivor + prompt projection | — | Built-in |
 
+## Telemetry
+
+The SDK emits **anonymous, opt-out** usage telemetry (SDK version, runtime, a coarse model-family bucket, and which features are used) — never code, prompts, repo identity, paths, or keys, and a no-op unless you configure a collector. Disable with `ANYCLAUDE_TELEMETRY=0`, `DO_NOT_TRACK=1`, or `query({ disableTelemetry: true })`. Full disclosure: [TELEMETRY.md](TELEMETRY.md).
+
 ## License
 
 MIT
