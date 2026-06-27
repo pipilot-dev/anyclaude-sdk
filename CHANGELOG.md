@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.7.2
+- README/docs refresh: corrected the Telemetry section (it now describes the default aggregate-only collector instead of the stale "no-op unless configured"), and added sections for the Claude-Code router (`anyclaude-sdk/anthropic-endpoint`), reliable tool use (dialects/profiles/repair), `create-anyclaude-app`, the live compaction marker, and `MessageQueue.remove`. No code changes.
+
 ### 0.7.1
 - Telemetry now defaults to a live aggregate-only collector (`https://anyclaude-telemetry.puter.work`, a Puter Worker — source in `examples/telemetry-collector/puter-worker.js`). All opt-outs (`ANYCLAUDE_TELEMETRY=0` / `DO_NOT_TRACK` / `CI` / `disableTelemetry` / browser localStorage) and the `ANYCLAUDE_TELEMETRY_URL` override are unchanged; set the URL to `''` to disable sending. The schema and privacy guarantees from 0.7.0 are identical.
 

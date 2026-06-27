@@ -358,9 +358,43 @@ npm install anyclaude-react
 
 `useAgent()` plus restylable components — chat (`AgentChat`, `ChatPanel`, `Transcript`, `MarkdownMessage`, `Composer`, `Working`, `ToolCall`) and an IDE set (`Terminal`, `FileExplorer`, `CodeEditor`, `AskUser`). `createAgentClient` / `createEndpointClient` auto-stitch `paused` continuations and run `clientTools` in the browser.
 
+## Run Claude Code against any model — `anyclaude-sdk/anthropic-endpoint`
+
+Stand up an Anthropic Messages API-compatible endpoint backed by any OpenAI-compatible model, so **Claude Code itself** (or any Anthropic-Messages client) runs against DeepSeek / Qwen / GLM / Kimi / local Ollama. Unlike a naive proxy, inline tool-call **dialects are recovered into proper `tool_use` blocks**, so tool use actually works on cheap models.
+
+```ts
+import { createOpenAIClient } from 'anyclaude-sdk/llm'
+import { anthropicToChat, anthropicSSE } from 'anyclaude-sdk/anthropic-endpoint'
+
+const llm = createOpenAIClient({ baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', apiKey })
+// POST /v1/messages:
+for await (const evt of anthropicSSE(llm, anthropicToChat(body), { model: 'deepseek-chat' })) res.write(evt)
+// then: ANTHROPIC_BASE_URL=http://localhost:8787 claude
+```
+
+Runnable: [`examples/claude-code-router`](examples/claude-code-router).
+
+## Reliable tool use on cheap / open models
+
+Frontier models emit clean native function-calls; cheaper ones often don't. Three layers (in `anyclaude-sdk/llm`) close the gap: **tool-call dialects** (`parseToolCalls` — xml-function / hermes / json-fence), **auto-detected model profiles** (`profileForModel` — qwen/deepseek/moonshot/zhipu/mistral/llama), and **self-healing argument repair** (`query({ repairToolCalls })`, on by default — validates args and feeds the model a corrective tool_result instead of running with garbage). Prove it on your endpoints with [`scripts/compat-matrix.mjs`](scripts/compat-matrix.mjs) → [COMPATIBILITY.md](COMPATIBILITY.md).
+
+## Scaffold an in-browser AI IDE
+
+```bash
+npm create anyclaude-app@latest my-app   # template: bolt — WebContainer + chat + live preview, no backend
+```
+
+The `bolt` template wires `useWebContainerPreview({ wc })` (boot a dev server → live preview URL) + a browser-side `query()` + the IDE components. See [`anyclaude-react`](#react-ui-kit--anyclaude-react).
+
+## Other niceties
+
+- **Live compaction marker** — `autoCompact` emits a `compact_boundary` with `status: 'start'` *before* summarizing (for a live "compacting…" shimmer) and `status: 'end'` after with `post_tokens`.
+- **Cancel a queued message** — `MessageQueue.push()` returns a stable id; `remove(id)` cancels a single pending message (per-pill ✕ in a UI).
+- **BYO LLM client** — reuse the SDK's wire codec: `toOpenAIMessages`, `consumeSSE`, and the LLM types from `anyclaude-sdk/llm` (no bare-root import in browser bundles).
+
 ## Examples & live demo
 
-Runnable Vite projects in [`examples/`](examples/): **`browser-ide`** (WebContainer IDE — real shell + Node in the tab), `browser-chat`, `vercel-kv-survivor`, `vercel-supabase-survivor`, `vercel-indexeddb-survivor`, **`vercel-clienttools`** (server brain / browser hands). Try the **[live demo](https://anyclaude-docs.puter.site/demo/)**.
+Runnable Vite projects in [`examples/`](examples/): **`browser-ide`** (WebContainer IDE — real shell + Node in the tab), `browser-chat`, `claude-code-router`, `vercel-kv-survivor`, `vercel-supabase-survivor`, `vercel-indexeddb-survivor`, **`vercel-clienttools`** (server brain / browser hands). Try the **[live demo](https://anyclaude-docs.puter.site/demo/)**.
 
 ## API
 
@@ -376,6 +410,10 @@ Runnable Vite projects in [`examples/`](examples/): **`browser-ide`** (WebContai
 - `WebContainerWorkspace`, `MemoryFileSystem`, `NoopCommandExecutor`, `LocalSandbox`, `composeWorkspace`
 - `defineTool` (custom tools), `projectMessages` (server-side stream redaction)
 - `ALL_CLAUDE_CODE_TOOLS`, individual tools, `toolDefs`, `toolByName`
+- browser-clean subpaths: `anyclaude-sdk/{query,loop,llm,fs,workspace,tools,session,memory,compact,permissions,skills,queue,prompt,anthropic-endpoint,telemetry}`
+- `anyclaude-sdk/llm`: `parseToolCalls` + dialects, `profileForModel` (model profiles), `validateToolArguments` (repair), `toOpenAIMessages` / `consumeSSE` (BYO-client codec)
+- `anyclaude-sdk/anthropic-endpoint`: `anthropicToChat`, `anthropicSSE`, `streamResultToAnthropicMessage` (Claude-Code router)
+- `runToolLoop` (`/loop`), `compactWithWindow` (`/compact`), `track`/`telemetryEnabled` (`/telemetry`)
 - All `SDK*` message types, `ContentBlockParam`, `LLMClient`, `ToolDef`, `SessionStoreLike`, etc.
 
 ## Differences from the official SDK
@@ -392,7 +430,7 @@ Runnable Vite projects in [`examples/`](examples/): **`browser-ide`** (WebContai
 
 ## Telemetry
 
-The SDK emits **anonymous, opt-out** usage telemetry (SDK version, runtime, a coarse model-family bucket, and which features are used) — never code, prompts, repo identity, paths, or keys, and a no-op unless you configure a collector. Disable with `ANYCLAUDE_TELEMETRY=0`, `DO_NOT_TRACK=1`, or `query({ disableTelemetry: true })`. Full disclosure: [TELEMETRY.md](TELEMETRY.md).
+The SDK emits **anonymous, opt-out** usage telemetry (SDK version, runtime, a coarse model-family bucket, and which features are used) — never code, prompts, repo identity, paths, or keys. It sends to an aggregate-only collector (a Puter Worker; source in [`examples/telemetry-collector`](examples/telemetry-collector)). Disable with `ANYCLAUDE_TELEMETRY=0`, `DO_NOT_TRACK=1`, or `query({ disableTelemetry: true })`; repoint with `ANYCLAUDE_TELEMETRY_URL` (or set it to `''` to send nowhere). Full disclosure: [TELEMETRY.md](TELEMETRY.md).
 
 ## License
 
