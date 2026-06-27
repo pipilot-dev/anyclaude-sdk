@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.6.2
+- Auto-compaction now emits a **`compact_boundary` with `status: 'start'` BEFORE** the (possibly slow) summarization, then `status: 'end'` after — so a UI can show a live "compacting…" indicator during the work instead of only a retroactive marker. `compact_metadata` gains `status?: 'start' | 'end'` and `post_tokens?` (token estimate after compaction); `pre_tokens` on auto-compaction is now the real transcript estimate (was the threshold). `status` is absent only on pre-0.6.2 streams — treat absent as `'end'` (backward-compatible). Manual `/compact` emits a single `status: 'end'` boundary.
+
 ### 0.6.1
 - `MessageQueue`: each queued message now carries a stable `id`, `push()` returns it, and a new `remove(id)` cancels a single pending message (e.g. a per-pill ✕ in the UI) — previously only `shift`/`clear` were available, so an individual queued item couldn't be cancelled mid-run. `remove` returns `false` for unknown / already-drained ids and doesn't fire `onChange` in that case. Additive and backward-compatible (`push`'s return value was `void`).
 

@@ -192,7 +192,20 @@ export type SDKSystemMessage = {
 export type SDKCompactBoundaryMessage = {
   type: 'system'
   subtype: 'compact_boundary'
-  compact_metadata: { trigger: 'manual' | 'auto'; pre_tokens: number }
+  compact_metadata: {
+    trigger: 'manual' | 'auto'
+    /** Transcript token estimate when compaction began. */
+    pre_tokens: number
+    /**
+     * Compaction phase: `'start'` is emitted BEFORE the (possibly slow)
+     * summarization so a UI can show a live "compacting…" indicator; `'end'`
+     * is emitted after, with `post_tokens` set. Absent ⇒ treat as `'end'`
+     * (back-compat: pre-0.6.2 only emitted the post-compaction boundary).
+     */
+    status?: 'start' | 'end'
+    /** Transcript token estimate after compaction (only on `status: 'end'`). */
+    post_tokens?: number
+  }
   uuid: string
   session_id: string
 }

@@ -668,7 +668,12 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
           yield {
             type: 'system',
             subtype: 'compact_boundary',
-            compact_metadata: { trigger: 'manual', pre_tokens: 0 },
+            compact_metadata: {
+              trigger: 'manual',
+              pre_tokens: 0,
+              status: 'end',
+              post_tokens: Math.round(estimateTokens(history)),
+            },
             uuid: uuid(),
             session_id: sessionId,
           }
@@ -769,21 +774,37 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
       if (options.autoCompact && autoCompactCount < 3 && history.length > 3) {
         const limit = options.contextLimit ?? (contextWindowFor(resultModel) || 200_000)
         const threshold = (options.compactThreshold ?? 0.8) * limit
-        if (estimateTokens(history) > threshold) {
+        const preTokens = estimateTokens(history)
+        if (preTokens > threshold) {
           await runHooks('PreCompact', { hook_event_name: 'PreCompact', trigger: 'auto' })
+          // Emit a START boundary BEFORE the (possibly slow) summarization so a UI
+          // can show a live "compacting…" indicator while the LLM call is in flight.
+          yield {
+            type: 'system',
+            subtype: 'compact_boundary',
+            compact_metadata: { trigger: 'auto', pre_tokens: Math.round(preTokens), status: 'start' },
+            uuid: uuid(),
+            session_id: sessionId,
+          }
           const compacted = await summarizeHistory(history, llm, { model, signal })
           if (compacted) {
             history.splice(0, history.length, ...compacted)
             autoCompactCount++
-            yield {
-              type: 'system',
-              subtype: 'compact_boundary',
-              compact_metadata: { trigger: 'auto', pre_tokens: Math.round(threshold) },
-              uuid: uuid(),
-              session_id: sessionId,
-            }
-            await runHooks('PostCompact', { hook_event_name: 'PostCompact', trigger: 'auto' })
           }
+          // END boundary closes the live indicator either way (compacted or not).
+          yield {
+            type: 'system',
+            subtype: 'compact_boundary',
+            compact_metadata: {
+              trigger: 'auto',
+              pre_tokens: Math.round(preTokens),
+              status: 'end',
+              post_tokens: Math.round(estimateTokens(history)),
+            },
+            uuid: uuid(),
+            session_id: sessionId,
+          }
+          if (compacted) await runHooks('PostCompact', { hook_event_name: 'PostCompact', trigger: 'auto' })
         }
       }
 

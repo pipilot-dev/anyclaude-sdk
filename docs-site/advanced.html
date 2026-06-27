@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.6.1 · MIT</div>
+    <div class="brand-sub">v0.6.2 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
@@ -200,15 +200,24 @@ query({
 
     <section id="compaction">
       <h2>Auto-compaction</h2>
-      <p>Long runs can summarize themselves before hitting the context window. Enable <code>autoCompact</code>; tune the window and trigger point. When it fires it emits a <code>compact_boundary</code> system message (and runs <code>PreCompact</code>/<code>PostCompact</code> hooks).</p>
+      <p>Long runs can summarize themselves before hitting the context window. Enable <code>autoCompact</code>; tune the window and trigger point. It runs <code>PreCompact</code>/<code>PostCompact</code> hooks and emits <code>compact_boundary</code> system messages around the work.</p>
       <div class="code"><pre><code class="language-ts">query({
   prompt, workspace, llm,
   autoCompact: true,
   contextLimit: 200_000,      // tokens; defaults to the model's window
   compactThreshold: 0.8,      // compact when the transcript passes 80% of the limit
 })</code></pre></div>
+      <h3>Live compaction marker <span class="pill">0.6.2</span></h3>
+      <p>Summarization can take seconds, so auto-compaction emits the boundary <b>twice</b> — <code>status: 'start'</code> before it begins (show a live "compacting…" shimmer) and <code>status: 'end'</code> after (swap to a retroactive marker with the token reduction). <code>pre_tokens</code> / <code>post_tokens</code> give the before/after estimates.</p>
+      <div class="code"><pre><code class="language-ts">for await (const m of run) {
+  if (m.type === 'system' &amp;&amp; m.subtype === 'compact_boundary') {
+    const { status, pre_tokens, post_tokens } = m.compact_metadata
+    if (status === 'start') showCompactingShimmer()                    // live, during the LLM call
+    else hideShimmer(`compacted ${pre_tokens} → ${post_tokens} tokens`) // status 'end' (or absent on old streams)
+  }
+}</code></pre></div>
       <div class="card" style="border-left:3px solid var(--accent)">
-        <p><i data-lucide="info"></i> Compaction is a turn-boundary operation, so it never interrupts a tool mid-flight. Pair it with a persistent <a href="#sessions">session</a> for unbounded multi-turn runs.</p>
+        <p><i data-lucide="info"></i> Compaction is a turn-boundary operation, so it never interrupts a tool mid-flight. Treat an <b>absent</b> <code>status</code> as <code>'end'</code> (pre-0.6.2 streams only emitted the post-compaction boundary). Pair it with a persistent <a href="#sessions">session</a> for unbounded multi-turn runs.</p>
       </div>
     </section>
   </main>
