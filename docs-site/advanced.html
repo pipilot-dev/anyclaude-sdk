@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.7.1 · MIT</div>
+    <div class="brand-sub">v0.9.0 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
@@ -219,6 +219,26 @@ query({
       <div class="card" style="border-left:3px solid var(--accent)">
         <p><i data-lucide="info"></i> Compaction is a turn-boundary operation, so it never interrupts a tool mid-flight. Treat an <b>absent</b> <code>status</code> as <code>'end'</code> (pre-0.6.2 streams only emitted the post-compaction boundary). Pair it with a persistent <a href="#sessions">session</a> for unbounded multi-turn runs.</p>
       </div>
+    </section>
+
+    <section id="efficiency">
+      <h2><i data-lucide="gauge"></i> Token &amp; latency tuning <span class="pill">0.8–0.9</span></h2>
+      <p>Opt-in knobs to make the loop cheaper and faster — biggest impact on weak / uncached models (where every fixed token is paid each turn):</p>
+      <div class="code"><pre><code class="language-ts">query({
+  prompt, workspace, llm,
+  systemPromptPreset: 'lean',       // ~70% shorter built-in prompt (paid every turn on uncached models)
+  keepToolResults: 6,               // context editing: stub tool_results older than the last 6 — caps transcript growth
+  parallelToolExecution: true,      // run a turn's read-only tool calls concurrently (~2× on multi-read turns)
+  deferredTools: ['stripe_charge', 'supabase_query', /* … */], // keep niche tools out of the payload
+})</code></pre></div>
+      <table class="opts">
+        <tr><th>Knob</th><th>Effect</th></tr>
+        <tr><td><code>systemPromptPreset: 'lean'</code></td><td>Swaps the full Claude-Code contract for a compact one. Per-turn savings on uncached endpoints.</td></tr>
+        <tr><td><code>keepToolResults: N</code></td><td>Keeps the most recent N <code>tool_result</code> messages verbatim; older ones become a stub. Long-run growth cap.</td></tr>
+        <tr><td><code>parallelToolExecution</code></td><td>Concurrently executes a turn's calls when all are read-only / <code>parallelSafe</code> server tools (mutating/bash/delegated stay serial; order preserved).</td></tr>
+        <tr><td><code>deferredTools</code> / <code>defineTool({ defer })</code></td><td>Large tool pools: register all, send a lean core; <code>tool_search</code> arms a tool on demand. Register 35, send ~10.</td></tr>
+      </table>
+      <p>Mark a custom read tool concurrency-safe with <code>defineTool({ parallelSafe: true })</code>. All four are correctness-preserving — they trim cost/latency, not behavior.</p>
     </section>
 
     <section id="telemetry">
