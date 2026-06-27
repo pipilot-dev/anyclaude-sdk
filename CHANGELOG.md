@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.10.2
+- **`broadcast-channel` is now a real dependency** (promoted from optional peer) and **`BroadcastChannelMailbox.crossTab()`** wires it up in one call: a durable cross-tab/cross-context mailbox (IndexedDB/localStorage fallbacks, older browsers + Node) without the caller importing the package. `const mb = await BroadcastChannelMailbox.crossTab({ channelName: 'team', origin: 'planner' }); query({ team: true, mailbox: mb })`. The package is lazy-imported inside `crossTab()`, so bundles that never call it don't pull it in. The plain `new BroadcastChannelMailbox()` (global `BroadcastChannel`) path is unchanged.
+
 ### 0.10.1
 - **fix(background): comlink now ships with the SDK.** The Comlink worker harness (`wrapWorker` / `exposeBackgroundWorker`) lazy-imports `comlink`, but it was a *devDependency* — so it worked in this repo yet threw `Cannot find module 'comlink'` for anyone who `npm i anyclaude-sdk` and used a worker. Moved `comlink` to **`dependencies`** so the worker path works zero-config. Still lazy-imported behind `await import` with `sideEffects: false`, so bundlers don't pull it into browser bundles unless `wrapWorker` is actually used. (Verified the harness end-to-end: a main-thread `wrapWorker(...).run()` executes inside a real worker and returns.)
 - **`broadcast-channel` added as an optional peer dependency.** `BroadcastChannelMailbox` defaults to the global `BroadcastChannel` (browsers + Node ≥15) and needs no package; install `broadcast-channel` only for the injected cross-tab / legacy-runtime path.

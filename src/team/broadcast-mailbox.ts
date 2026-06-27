@@ -97,6 +97,28 @@ export class BroadcastChannelMailbox extends Mailbox {
     }
   }
 
+  /**
+   * Cross-tab/cross-context mailbox in one call, backed by the bundled
+   * `broadcast-channel` package (durable across tabs via IndexedDB/localStorage
+   * fallbacks, and works in older browsers + Node). Async because the package
+   * is lazy-imported so it stays out of bundles that don't use it.
+   *
+   *   const mb = await BroadcastChannelMailbox.crossTab({ channelName: 'team', origin: 'planner' })
+   *   query({ prompt, workspace, llm, team: true, mailbox: mb })
+   */
+  static async crossTab(
+    opts: { channelName?: string; origin?: string; channelOptions?: unknown } = {}
+  ): Promise<BroadcastChannelMailbox> {
+    const mod = (await import('broadcast-channel')) as {
+      BroadcastChannel?: new (name: string, o?: unknown) => ChannelLike
+      default?: { BroadcastChannel?: new (name: string, o?: unknown) => ChannelLike }
+    }
+    const BC = mod.BroadcastChannel ?? mod.default?.BroadcastChannel
+    if (!BC) throw new Error('broadcast-channel package did not export BroadcastChannel')
+    const channel = new BC(opts.channelName ?? 'anyclaude-team', opts.channelOptions)
+    return new BroadcastChannelMailbox({ channel, origin: opts.origin })
+  }
+
   /** Send a message: append to the local replica and broadcast to peers. */
   override send(from: string, to: string, text: string): string {
     // Globally-unique id: origin-scoped so two workers never collide.

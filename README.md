@@ -214,9 +214,15 @@ query({ prompt, workspace, llm, team: true, mailbox })
 // messages sent by one worker land in the addressed agent's inbox in another.
 ```
 
-Uses the global `BroadcastChannel` by default; pass `{ channel }` (e.g. the
-[`broadcast-channel`](https://www.npmjs.com/package/broadcast-channel) package)
-for cross-tab durability or older runtimes.
+Uses the global `BroadcastChannel` by default. For durable cross-tab delivery
+(IndexedDB/localStorage fallbacks, older browsers, Node) use the one-call helper
+— it's backed by the bundled [`broadcast-channel`](https://www.npmjs.com/package/broadcast-channel)
+package, lazy-imported so it stays out of bundles that don't use it:
+
+```typescript
+const mailbox = await BroadcastChannelMailbox.crossTab({ channelName: 'team', origin: 'planner' })
+query({ prompt, workspace, llm, team: true, mailbox })
+```
 
 ## Pluggable backends
 
