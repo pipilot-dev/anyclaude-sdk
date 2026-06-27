@@ -24,6 +24,21 @@ When the task is complete, stop calling tools and give a short summary of what y
 }
 
 /**
+ * Lean system prompt — a much shorter contract for token-sensitive / weak models
+ * (and uncached endpoints, where the prompt is paid every turn). Keeps only the
+ * load-bearing rules: read-before-edit, exact edit matching, stop when done.
+ */
+export function leanSystemPrompt(cwd: string): string {
+  return `You are a coding agent working on a real workspace (files + shell) via tools. Working directory: ${cwd}.
+Rules: read a file with read_file before edit_file; edit_file old_string must match exactly (else add context or use replace_all); prefer file tools over cat/sed; batch independent tool calls. Be concise. When done, stop calling tools and give a one-line summary.`
+}
+
+/** Pick the built-in system prompt by preset. */
+export function systemPromptFor(cwd: string, preset?: 'default' | 'lean'): string {
+  return preset === 'lean' ? leanSystemPrompt(cwd) : defaultSystemPrompt(cwd)
+}
+
+/**
  * Default system prompt for a general-purpose sub-agent spawned via the `task`
  * tool. The sub-agent runs autonomously and returns only its final answer.
  */

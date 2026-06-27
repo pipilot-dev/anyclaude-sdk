@@ -35,12 +35,20 @@ export interface QueryOptions {
   extraTools?: Tool[]
   model?: string
   systemPrompt?: string
+  /** Built-in prompt when `systemPrompt` is omitted: `'default'` or `'lean'` (shorter,
+   *  cheaper every turn on weak/uncached models). */
+  systemPromptPreset?: 'default' | 'lean'
   appendSystemPrompt?: string
   allowedTools?: string[]
   disallowedTools?: string[]
   /** Tool names to defer out of the per-turn payload — discoverable via `tool_search`
    *  and armed on demand. Saves tokens on large tool pools (also per-tool `defer: true`). */
   deferredTools?: string[]
+  /** Context editing: keep only the most recent N tool_result messages verbatim; older
+   *  ones are stubbed before each LLM call. Caps transcript growth on long runs. */
+  keepToolResults?: number
+  /** Run a turn's read-only tool calls concurrently (mutating/bash/delegated stay serial). */
+  parallelToolExecution?: boolean
   maxTurns?: number
   /** Wall-clock budget (ms): pause at a turn boundary past this + emit `paused` (survivor). */
   maxDurationMs?: number
@@ -147,10 +155,13 @@ export function query(options: QueryOptions): Query {
     extraTools: options.extraTools,
     model: options.model,
     systemPrompt: options.systemPrompt,
+    systemPromptPreset: options.systemPromptPreset,
     appendSystemPrompt: options.appendSystemPrompt,
     allowedTools: options.allowedTools,
     disallowedTools: options.disallowedTools,
     deferredTools: options.deferredTools,
+    keepToolResults: options.keepToolResults,
+    parallelToolExecution: options.parallelToolExecution,
     maxTurns: options.maxTurns,
     maxDurationMs: options.maxDurationMs,
     continueRun: options.continueRun,

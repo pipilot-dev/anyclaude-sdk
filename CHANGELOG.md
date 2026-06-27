@@ -8,6 +8,12 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.9.0
+Three agent-loop efficiency knobs (all opt-in, work in `query()` + `runToolLoop()`):
+- **Lean system prompt** — `query({ systemPromptPreset: 'lean' })` uses a ~70% shorter built-in prompt (verified 363 vs 1246 chars). On uncached endpoints that's paid back **every turn**. New `leanSystemPrompt` / `systemPromptFor` exports.
+- **Context editing** — `query({ keepToolResults: N })` keeps only the most recent N `tool_result` messages verbatim and replaces older ones with a short stub before each LLM call, capping transcript growth on long runs. (Trades prompt-cache hits on the cleared span for fewer tokens — a clear win on uncached models.)
+- **Parallel tool execution** — `query({ parallelToolExecution: true })` runs a turn's tool calls concurrently when all are read-only / `parallelSafe` server tools (mutating tools, bash, and delegated client tools stay serial; results preserve order). ~2× faster on multi-read turns. New `defineTool({ parallelSafe: true })` lets custom read tools opt in.
+
 ### 0.8.1
 - docs(readme): document deferred tools (token-efficiency section + API option). No code change.
 

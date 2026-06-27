@@ -26,10 +26,11 @@ import type {
   ToolUseBlock,
   Usage,
 } from './types/index.js'
-import type { Tool, ToolContext } from './tools/types.js'
+import type { Tool, ToolContext, ToolResult } from './tools/types.js'
 import { toolByName, toolDefs } from './tools/index.js'
 import { validateToolArguments } from './llm/repair.js'
 import { parseToolCalls } from './llm/dialects.js'
+import { isReadOnlyTool } from './permissions/index.js'
 import { uuid } from './util/ids.js'
 
 export interface RunToolLoopOptions {
@@ -68,6 +69,9 @@ export interface RunToolLoopOptions {
    * Default `true`. Set `false` to pass raw args straight through.
    */
   repairToolCalls?: boolean
+  /** Run a turn's tool calls concurrently when all are read-only + server-run
+   *  (mutating/bash/delegated stay serial). Latency win on multi-read turns. */
+  parallelToolExecution?: boolean
 }
 
 /** Regex that matches the onset of tool-call / reasoning markup in streamed text. */
@@ -266,6 +270,26 @@ export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDK
 
     const toolResultBlocks: ContentBlockParam[] = []
     const turnMedia: Array<ImageBlock | DocumentBlock> = []
+
+    // Parallel tool execution: when all calls this turn are read-only + server-run,
+    // run them concurrently up front; the loop assembles results in order below.
+    const prefetch = new Map<string, Promise<{ r?: ToolResult; e?: unknown }>>()
+    if (
+      opts.parallelToolExecution &&
+      calls.length > 1 &&
+      calls.every((c) => {
+        const t = byName.get(c.function.name)
+        if (clientTools.has(c.function.name) || !t?.run) return false
+        return t.parallelSafe === true || isReadOnlyTool(c.function.name, safeParse(c.function.arguments))
+      })
+    ) {
+      for (const c of calls) {
+        const t = byName.get(c.function.name)!
+        const input = safeParse(c.function.arguments)
+        prefetch.set(c.id, Promise.resolve().then(() => t.run!(input, ctx)).then((r) => ({ r }), (e) => ({ e })))
+      }
+    }
+
     for (const call of calls) {
       if (signal?.aborted) break
       const name = call.function.name
@@ -312,9 +336,18 @@ export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDK
           content = `Permission denied: ${decision.message}`
           isError = true
         } else {
+          const inputChanged = !!('updatedInput' in decision && decision.updatedInput)
           if ('updatedInput' in decision && decision.updatedInput) input = decision.updatedInput
           try {
-            const r = await tool.run!(input, ctx)
+            const pf = !inputChanged ? prefetch.get(call.id) : undefined
+            let r: ToolResult
+            if (pf) {
+              const out = await pf
+              if (out.e !== undefined) throw out.e
+              r = out.r!
+            } else {
+              r = await tool.run!(input, ctx)
+            }
             content = r.content
             isError = !!r.isError
           } catch (err) {

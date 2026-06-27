@@ -27,6 +27,8 @@ export interface DefineToolSpec {
   /** Defer out of the per-turn payload — discoverable via `tool_search`, armed on
    *  demand. For large pools of rarely-used tools (see Tool.defer). */
   defer?: boolean
+  /** Safe to run concurrently with other calls in a turn (see Tool.parallelSafe). */
+  parallelSafe?: boolean
 }
 
 /** Build a `Tool` from a friendly spec. */
@@ -49,5 +51,6 @@ export function defineTool(spec: DefineToolSpec): Tool {
   if (spec.run) tool.run = async (input, ctx) => spec.run!(input, ctx)
   if (spec.maxResultChars !== undefined) tool.maxResultChars = spec.maxResultChars
   if (spec.defer) tool.defer = true
+  if (spec.parallelSafe) tool.parallelSafe = true
   return tool
 }

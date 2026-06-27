@@ -36,7 +36,7 @@ import type {
   ToolUseBlock,
   Usage,
 } from './types/index.js'
-import type { FileReadLimits, Tool, ToolContext } from './tools/types.js'
+import type { FileReadLimits, Tool, ToolContext, ToolResult } from './tools/types.js'
 import { ALL_CLAUDE_CODE_TOOLS, toolByName, toolDefs, WORKSPACE_TOOL_NAMES } from './tools/index.js'
 import { task as taskTool } from './tools/task.js'
 import { askUserQuestion } from './tools/ask_user.js'
@@ -58,7 +58,7 @@ import {
 } from './permissions/index.js'
 import { loadSettings, mergeSettings, settingsToPermissionRuleSet, type Settings } from './settings/index.js'
 import { loadSkillsFromFs, skillsToCommands, skill as skillTool, type Skill } from './skills/index.js'
-import { defaultSystemPrompt, defaultSubagentPrompt } from './prompt.js'
+import { defaultSubagentPrompt, systemPromptFor } from './prompt.js'
 import { DEFAULT_MAX_RESULT_CHARS, maybePersistLargeResult } from './persist.js'
 import { computeCostUSD, contextWindowFor } from './util/pricing.js'
 import { estimateTokens, summarizeHistory } from './compact.js'
@@ -96,8 +96,12 @@ export interface AgentOptions {
   /** Custom tools ADDED to the builtins (or to `tools` if given). Use `defineTool`. */
   extraTools?: Tool[]
   model?: string
-  /** Full system prompt. If omitted, the default Claude Code prompt is used. */
+  /** Full system prompt. If omitted, the built-in prompt for `systemPromptPreset` is used. */
   systemPrompt?: string
+  /** Which built-in system prompt to use when `systemPrompt` is omitted: `'default'`
+   *  (full Claude-Code contract) or `'lean'` (much shorter — cheaper every turn on
+   *  weak/uncached models). Default `'default'`. */
+  systemPromptPreset?: 'default' | 'lean'
   /** Text appended after the (default or custom) system prompt. */
   appendSystemPrompt?: string
   /** Allowlist of tool names. When set, only these tools are exposed. */
@@ -109,6 +113,14 @@ export interface AgentOptions {
    *  until the model searches and the loop arms them. For large pools of
    *  rarely-used integration tools. (Per-tool `defer: true` works too.) */
   deferredTools?: string[]
+  /** Context editing: keep only the most recent N tool_result messages verbatim;
+   *  older ones are replaced with a short stub before each LLM call. Caps transcript
+   *  growth on long runs. Off when undefined. (Trades prompt-cache hits on the cleared
+   *  span for fewer tokens — a clear win on uncached endpoints.) */
+  keepToolResults?: number
+  /** Execute a turn's tool calls concurrently when they're all read-only + server-run
+   *  (mutating tools / bash / delegated stay sequential). Latency win on multi-read turns. */
+  parallelToolExecution?: boolean
   maxTurns?: number
   /** Wall-clock budget (ms). At a turn boundary past this, the loop pauses: it
    *  persists to sessionStore and emits a `paused` system message instead of
@@ -479,7 +491,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
   })()
 
   let system =
-    options.systemPrompt != null ? options.systemPrompt : defaultSystemPrompt(cwd)
+    options.systemPrompt != null ? options.systemPrompt : systemPromptFor(cwd, options.systemPromptPreset)
   if (teamEnabled) system += '\n\n' + coordinatorPrompt()
   if (memory) {
     const mem = await memory.render()
@@ -488,6 +500,22 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
   if (options.appendSystemPrompt) system += '\n\n' + options.appendSystemPrompt
 
   const history: ChatMsg[] = [{ role: 'system', content: system }]
+
+  // Context editing: keep the most recent N tool_result messages verbatim; replace
+  // older ones with a short stub (idempotent) so they stop costing tokens each turn.
+  const keepToolResults = options.keepToolResults
+  const CLEARED_STUB = '[earlier tool output cleared to save context]'
+  const pruneToolResults = (): void => {
+    if (keepToolResults == null || keepToolResults < 0) return
+    const toolIdx: number[] = []
+    for (let i = 0; i < history.length; i++) if (history[i].role === 'tool') toolIdx.push(i)
+    const cutoff = toolIdx.length - keepToolResults
+    for (let j = 0; j < cutoff; j++) {
+      const m = history[toolIdx[j]]
+      if (typeof m.content === 'string' && m.content !== CLEARED_STUB) m.content = CLEARED_STUB
+      else if (Array.isArray(m.content)) m.content = CLEARED_STUB
+    }
+  }
 
   const store: AgentStore = { todos: [] }
   const ctx: ToolContext = {
@@ -843,6 +871,10 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
         }
       }
 
+      // Context editing: stub out all but the most recent N tool_result messages so
+      // old tool output stops costing tokens on every subsequent turn.
+      pruneToolResults()
+
       let streamedText = ''
       let captured: ToolCall[] = []
       const apiStart = Date.now()
@@ -959,6 +991,34 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
       const toolResultBlocks: ContentBlockParam[] = []
       clientRequests = []
       const turnMedia: Array<ImageBlock | import('./types/index.js').DocumentBlock> = []
+
+      // Parallel tool execution: when every call this turn is read-only + server-run,
+      // kick off the runs concurrently up front; the sequential loop below still does
+      // permission/hooks/assembly in order but awaits these prefetched results instead
+      // of running serially. Read-only ⇒ no ordering/side-effect risk. (Mutating tools,
+      // bash, and delegated client tools fall through to the normal serial path.)
+      const prefetch = new Map<string, Promise<{ r?: ToolResult; e?: unknown }>>()
+      if (
+        options.parallelToolExecution &&
+        calls.length > 1 &&
+        calls.every((c) => {
+          const t = byName.get(c.function.name)
+          if (clientTools.has(c.function.name) || !t?.run) return false
+          return t.parallelSafe === true || isReadOnlyTool(c.function.name, safeParse(c.function.arguments))
+        })
+      ) {
+        for (const c of calls) {
+          const t = byName.get(c.function.name)!
+          const input = safeParse(c.function.arguments)
+          prefetch.set(
+            c.id,
+            Promise.resolve()
+              .then(() => t.run!(input, ctx))
+              .then((r) => ({ r }), (e) => ({ e }))
+          )
+        }
+      }
+
       for (const call of calls) {
         if (signal?.aborted) break
         const name = call.function.name
@@ -1074,10 +1134,20 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
               await denyTool(decision.message)
               if (decision.interrupt) abortController?.abort()
             } else {
-              if ('updatedInput' in decision && decision.updatedInput)
-                input = decision.updatedInput
+              const inputChanged = !!('updatedInput' in decision && decision.updatedInput)
+              if ('updatedInput' in decision && decision.updatedInput) input = decision.updatedInput
               try {
-                const r = await tool.run(input, ctx)
+                // Use the concurrently-prefetched result when present and the input
+                // wasn't rewritten by permission; otherwise run now.
+                const pf = !inputChanged ? prefetch.get(call.id) : undefined
+                let r: ToolResult
+                if (pf) {
+                  const out = await pf
+                  if (out.e !== undefined) throw out.e
+                  r = out.r!
+                } else {
+                  r = await tool.run(input, ctx)
+                }
                 content = r.content
                 isError = !!r.isError
               } catch (err) {

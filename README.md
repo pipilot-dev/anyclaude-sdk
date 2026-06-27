@@ -400,6 +400,24 @@ query({ prompt, workspace, llm,
 
 Only the lean core + `tool_search` are sent each turn; the model searches when it needs a niche tool, the SDK arms it, and the call goes through. Register 35, send ~10.
 
+## Agent-loop tuning (cheap / lightweight / fast)
+
+Opt-in knobs for token cost and latency — especially on weak / uncached models:
+
+```ts
+query({
+  prompt, workspace, llm,
+  systemPromptPreset: 'lean',      // ~70% shorter built-in prompt — saved every turn on uncached models
+  keepToolResults: 6,              // context editing: stub tool_results older than the last 6 (caps transcript growth)
+  parallelToolExecution: true,     // run a turn's read-only tool calls concurrently (~2× faster on multi-read turns)
+  deferredTools: [/* niche tools */], // keep rarely-used tools out of the payload until tool_search arms them
+})
+// custom read tool opting into parallelism:
+defineTool({ name: 'get_logs', description: '…', parameters, run, parallelSafe: true })
+```
+
+Mutating tools / `bash` / delegated client tools always execute serially; `keepToolResults` and `parallelToolExecution` preserve correctness, just trim cost/latency.
+
 ## Other niceties
 
 - **Live compaction marker** — `autoCompact` emits a `compact_boundary` with `status: 'start'` *before* summarizing (for a live "compacting…" shimmer) and `status: 'end'` after with `post_tokens`.

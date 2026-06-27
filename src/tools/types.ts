@@ -103,4 +103,11 @@ export interface Tool {
    * rarely-used integration tools. (Also settable via `query({ deferredTools })`.)
    */
   defer?: boolean
+  /**
+   * Mark this tool safe to execute CONCURRENTLY with other calls in the same turn
+   * (no side effects / no ordering dependency) — opts it into `parallelToolExecution`
+   * even if it isn't a recognized read-only builtin. Set on custom read tools
+   * (e.g. get_console_logs, screenshot, fetch-status).
+   */
+  parallelSafe?: boolean
 }
