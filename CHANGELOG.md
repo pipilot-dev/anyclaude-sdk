@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.8.0
+- **Deferred tools (lazy tool loading)** — keep a large pool of rarely-used tools OUT of the per-turn payload (big token savings, esp. on weak/uncached models) while staying discoverable and callable. Mark via `query({ deferredTools: ['stripe_charge', …] })` or per-tool `defineTool({ defer: true })`. Deferred tools aren't sent to the model, but `tool_search` indexes them; when it surfaces one, the loop **arms** it (its schema is included on subsequent turns) and it executes normally. New `ToolContext.armTools(names)`. Mirrors Anthropic's tool-search `defer_loading` pattern — register 35 integration tools, send ~10.
+
 ### 0.7.4
 - **Fix: raw tool-call / reasoning markup leaking into user-visible text.** When a model emitted a tool call in the named-tag dialect (`<finish>…</finish>`, the Cline/Roo/Aider convention) or left stray `<thinking>`/`<tool_call>`/`<function>`/`<parameter>` tags, the SDK didn't recognize them — so the raw tags rendered to the user and the tool never executed (the loop didn't terminate). Now:
   - `parseToolCalls(text, { toolNames })` recovers **named-tag tool calls** scoped to the known tool set (`parseNamedTagToolCalls`), extracting both `<parameter=k>v</parameter>` and direct `<k>v</k>` children.

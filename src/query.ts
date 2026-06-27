@@ -38,6 +38,9 @@ export interface QueryOptions {
   appendSystemPrompt?: string
   allowedTools?: string[]
   disallowedTools?: string[]
+  /** Tool names to defer out of the per-turn payload — discoverable via `tool_search`
+   *  and armed on demand. Saves tokens on large tool pools (also per-tool `defer: true`). */
+  deferredTools?: string[]
   maxTurns?: number
   /** Wall-clock budget (ms): pause at a turn boundary past this + emit `paused` (survivor). */
   maxDurationMs?: number
@@ -147,6 +150,7 @@ export function query(options: QueryOptions): Query {
     appendSystemPrompt: options.appendSystemPrompt,
     allowedTools: options.allowedTools,
     disallowedTools: options.disallowedTools,
+    deferredTools: options.deferredTools,
     maxTurns: options.maxTurns,
     maxDurationMs: options.maxDurationMs,
     continueRun: options.continueRun,

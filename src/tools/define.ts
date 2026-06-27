@@ -24,6 +24,9 @@ export interface DefineToolSpec {
   run?: (input: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult> | ToolResult
   /** Optional: spill threshold for large outputs (see Tool.maxResultChars). */
   maxResultChars?: number
+  /** Defer out of the per-turn payload — discoverable via `tool_search`, armed on
+   *  demand. For large pools of rarely-used tools (see Tool.defer). */
+  defer?: boolean
 }
 
 /** Build a `Tool` from a friendly spec. */
@@ -45,5 +48,6 @@ export function defineTool(spec: DefineToolSpec): Tool {
   // With a run → server-executed. Without → client-delegated (no run on the Tool).
   if (spec.run) tool.run = async (input, ctx) => spec.run!(input, ctx)
   if (spec.maxResultChars !== undefined) tool.maxResultChars = spec.maxResultChars
+  if (spec.defer) tool.defer = true
   return tool
 }

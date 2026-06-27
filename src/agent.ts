@@ -32,6 +32,7 @@ import type {
   StopReason,
   TextBlock,
   ToolCall,
+  ToolDef,
   ToolUseBlock,
   Usage,
 } from './types/index.js'
@@ -103,6 +104,11 @@ export interface AgentOptions {
   allowedTools?: string[]
   /** Denylist of tool names, applied after allowedTools. */
   disallowedTools?: string[]
+  /** Tool names to DEFER out of the per-turn payload — still discoverable via
+   *  `tool_search` and executable, but their schema isn't sent (saving tokens)
+   *  until the model searches and the loop arms them. For large pools of
+   *  rarely-used integration tools. (Per-tool `defer: true` works too.) */
+  deferredTools?: string[]
   maxTurns?: number
   /** Wall-clock budget (ms). At a turn boundary past this, the loop pauses: it
    *  persists to sessionStore and emits a `paused` system message instead of
@@ -446,8 +452,23 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
   if (options.clientWorkspaceTools) for (const n of WORKSPACE_TOOL_NAMES) clientTools.add(n)
   for (const t of tools) if (!t.run) clientTools.add(t.def.function.name)
 
-  const defs = toolDefs(tools)
+  const defs = toolDefs(tools) // FULL set — for the search index, suppression, and call recovery
   const byName = toolByName(tools)
+
+  // Deferred tools: kept OUT of the per-turn payload (token savings) but still
+  // discoverable via tool_search and executable. `tool_search` surfaces them and
+  // arms them (adds their schema to subsequent turns). tool_search itself is
+  // never deferred, or discovery breaks.
+  const deferredSet = new Set<string>(
+    [...(options.deferredTools ?? []), ...tools.filter((t) => t.defer).map((t) => t.def.function.name)].filter(
+      (n) => n !== 'tool_search'
+    )
+  )
+  const armed = new Set<string>()
+  const sentDefs = (): ToolDef[] =>
+    deferredSet.size
+      ? toolDefs(tools.filter((t) => !deferredSet.has(t.def.function.name) || armed.has(t.def.function.name)))
+      : defs
   // Stop streaming visible deltas once tool-call / reasoning markup begins (native
   // dialects, <thinking>, or named-tag tools like <finish>); final text is cleaned.
   const streamSuppressRe = (() => {
@@ -486,6 +507,11 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
     memory,
     skills,
     planMode,
+    armTools: deferredSet.size
+      ? (names) => {
+          for (const n of names) if (deferredSet.has(n)) armed.add(n)
+        }
+      : undefined,
   }
 
   const skillCommands = skillsToCommands(skills)
@@ -595,7 +621,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
     subtype: 'init',
     apiKeySource: 'none',
     cwd,
-    tools: defs.map((d) => d.function.name),
+    tools: sentDefs().map((d) => d.function.name),
     mcp_servers: mcpStatuses,
     model: model ?? 'unknown',
     permissionMode,
@@ -829,7 +855,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
           let inToolMarkup = false
           const sp = llm.streamChat(history, {
             model,
-            tools: defs,
+            tools: sentDefs(),
             signal,
             onToken: (delta) => {
               streamedText += delta
@@ -858,7 +884,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
         } else {
           result = await llm.streamChat(history, {
             model,
-            tools: defs,
+            tools: sentDefs(),
             signal,
             onToken: (delta) => {
               streamedText += delta

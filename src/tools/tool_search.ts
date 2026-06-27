@@ -40,9 +40,12 @@ export const toolSearch: Tool = {
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
     if (!scored.length) return { content: `No tools matched "${q}".` }
+    // Arm any deferred tools we surfaced so their full schema is sent next turn
+    // and the model can call them directly.
+    ctx.armTools?.(scored.map(({ t }) => t.name))
     return {
       content:
-        `Matching tools for "${q}":\n` +
+        `Matching tools for "${q}" (now available to call):\n` +
         scored.map(({ t }) => `  ${t.name} — ${t.description.split('\n')[0]}`).join('\n'),
     }
   },

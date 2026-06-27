@@ -70,6 +70,9 @@ export interface ToolContext {
   skills?: import('../skills/index.js').Skill[]
   /** Plan-mode state; when active, mutating tools are denied. */
   planMode?: { active: boolean }
+  /** Arm deferred tools by name so their full schema is sent on subsequent turns.
+   *  Provided by the loop; `tool_search` calls it for the deferred tools it surfaces. */
+  armTools?: (names: string[]) => void
 }
 
 /** Result returned by a tool run. */
@@ -92,4 +95,12 @@ export interface Tool {
    * When omitted, the loop uses its global default threshold.
    */
   maxResultChars?: number
+  /**
+   * DEFER this tool out of the per-turn payload sent to the LLM. It stays
+   * discoverable via `tool_search` and executable when called, but its schema
+   * isn't sent (saving tokens every turn) until `tool_search` surfaces it — at
+   * which point the loop "arms" it for subsequent turns. Use for large pools of
+   * rarely-used integration tools. (Also settable via `query({ deferredTools })`.)
+   */
+  defer?: boolean
 }
