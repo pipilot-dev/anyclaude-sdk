@@ -22,6 +22,28 @@ const CORS = {
   'access-control-max-age': '86400',
 }
 
+// Coarse country (2-letter code) derived from the request at the edge — the IP
+// itself is NEVER read into a variable, stored, or returned. 'ZZ' = unknown.
+function countryOf(request) {
+  let c = ''
+  try {
+    c = (request.cf && request.cf.country) || ''
+  } catch {
+    /* no cf */
+  }
+  const h = request.headers
+  c =
+    c ||
+    h.get('cf-ipcountry') ||
+    h.get('x-vercel-ip-country') ||
+    h.get('x-geo-country') ||
+    h.get('x-country-code') ||
+    h.get('x-country') ||
+    ''
+  const cc = String(c).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2)
+  return cc && cc.length === 2 && cc !== 'XX' ? cc : 'ZZ'
+}
+
 router.options('/*path', async () => new Response(null, { status: 204, headers: CORS }))
 
 router.post('/', async ({ request }) => {
@@ -35,7 +57,7 @@ router.post('/', async ({ request }) => {
   if (!ALLOWED_EVENTS.has(event)) return new Response(null, { status: 204, headers: CORS })
 
   const day = new Date().toISOString().slice(0, 10) // UTC date bucket for trends
-  const keys = [`event:${event}`, 'event:total', `day:${day}`]
+  const keys = [`event:${event}`, 'event:total', `day:${day}`, `country:${countryOf(request)}`]
   for (const [field, max] of Object.entries(STRING_FIELDS)) {
     const v = body[field]
     if (typeof v === 'string' && v) keys.push(`${field}:${v.slice(0, max).replace(/[^\w.\-]/g, '')}`)

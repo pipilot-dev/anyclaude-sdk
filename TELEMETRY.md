@@ -35,7 +35,9 @@ The default collector is an aggregate-only [Puter Worker](https://anyclaude-tele
 | `model_family` | `openai` / `anthropic` / `qwen` / `deepseek` / `generic` | a coarse bucket from the model id — **never the model id, endpoint, or key** |
 | feature booleans | `survivor: true`, `mcp: false`, … | which capabilities are used: `client_workspace_tools`, `client_tools`, `survivor`, `mcp`, `team`, `background`, `auto_compact`, `skills`, `sessions`, `partial_messages`, `resumed` |
 
-That's the entire schema. The transport is fire-and-forget (`keepalive`), never blocks the agent, and swallows its own errors.
+That's the entire schema the SDK sends. The transport is fire-and-forget (`keepalive`), never blocks the agent, and swallows its own errors.
+
+**Coarse country (collector-derived):** the collector additionally records a 2-letter **country code** derived from the request at the edge (e.g. `country:US`, `country:ZZ` for unknown), for a geographic breakdown of adoption. The **IP address is never read into a variable, stored, or returned** — only the country code is kept, as an aggregate counter. The SDK itself sends no location data; this is computed server-side from the connection.
 
 ## What is NEVER sent
 
@@ -47,7 +49,7 @@ Enforced in code (`src/telemetry.ts` whitelists prop keys and value types) and r
 - source code or file contents
 - prompts, messages, tool arguments, or LLM responses
 - API keys, tokens, endpoints, or base URLs
-- IP-derived location, machine ids, usernames, or any PII
+- the IP address (never read into a variable, stored, or logged — only a coarse country code is derived at the edge, see above), machine ids, usernames, or any other PII
 
 Anything not in the allowlist above is dropped before the request is built.
 

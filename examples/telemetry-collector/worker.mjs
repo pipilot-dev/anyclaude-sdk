@@ -29,6 +29,20 @@ const CORS = {
   'access-control-max-age': '86400',
 }
 
+// Coarse country (2-letter code) from the request — IP is never stored. 'ZZ' = unknown.
+function countryOf(request) {
+  let c = ''
+  try {
+    c = (request.cf && request.cf.country) || ''
+  } catch {
+    /* no cf */
+  }
+  const h = request.headers
+  c = c || h.get('cf-ipcountry') || h.get('x-vercel-ip-country') || h.get('x-geo-country') || h.get('x-country-code') || ''
+  const cc = String(c).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2)
+  return cc && cc.length === 2 && cc !== 'XX' ? cc : 'ZZ'
+}
+
 async function bump(kv, keys) {
   if (!kv) return
   await Promise.all(
@@ -67,7 +81,7 @@ export default {
 
       // Build aggregate counter keys from the allowlisted fields only. No raw
       // payload, no install id, nothing identifying is persisted.
-      const keys = [`event:${event}`, 'event:total']
+      const keys = [`event:${event}`, 'event:total', `country:${countryOf(request)}`]
       for (const [field, max] of Object.entries(STRING_FIELDS)) {
         const v = body[field]
         if (typeof v === 'string' && v) keys.push(`${field}:${v.slice(0, max).replace(/[^\w.\-]/g, '')}`)
