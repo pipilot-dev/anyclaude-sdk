@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.6.1
+- `MessageQueue`: each queued message now carries a stable `id`, `push()` returns it, and a new `remove(id)` cancels a single pending message (e.g. a per-pill ✕ in the UI) — previously only `shift`/`clear` were available, so an individual queued item couldn't be cancelled mid-run. `remove` returns `false` for unknown / already-drained ids and doesn't fire `onChange` in that case. Additive and backward-compatible (`push`'s return value was `void`).
+
 ### 0.6.0
 - **`anyclaude-sdk/anthropic-endpoint`** (new browser-clean subpath) — bridge the Anthropic Messages API to any OpenAI-compatible model via the SDK's `LLMClient`. Stand up a drop-in **claude-code-router**: point Claude Code (or any Anthropic-Messages client) at your server via `ANTHROPIC_BASE_URL` and run it against DeepSeek / Qwen / GLM / Kimi / local Ollama. Exports: `anthropicToChat` (Anthropic request → `ChatMsg[]` + `ToolDef[]`, splitting `tool_result` blocks into `tool` messages), `anthropicSSE` (run a turn → the exact Anthropic SSE event sequence), `streamResultToAnthropicMessage` (non-streaming), `anthropicToolsToDefs`. Inline tool-call **dialects are recovered into proper `tool_use` blocks**, so tool use works on cheap/open models — and raw `<tool_call>` markup never leaks into text deltas.
 - New example **`examples/claude-code-router`** — a zero-dependency Node server demonstrating the above, with config-driven routing (default / background / long-context) across providers.

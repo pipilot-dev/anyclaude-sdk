@@ -160,9 +160,14 @@ const queue = new MessageQueue()
 const run = query({ prompt: 'build the landing page', workspace, llm, messageQueue: queue })
 
 // …meanwhile, the user types a follow-up; it's delivered at the next turn boundary
-queue.push('also add a dark mode toggle')
+const id = queue.push('also add a dark mode toggle')   // returns a stable id
+
+// changed your mind before it's drained? cancel just that one (e.g. a per-pill ✕):
+queue.remove(id)                                       // → true if still pending
+queue.onChange((size) =&gt; renderPills(queue.list()))    // list() items carry { id, content, at }
 
 for await (const m of run) { /* render */ }</code></pre></div>
+      <p><code>push</code> returns a stable <code>id</code>; <code>remove(id)</code> cancels a single still-pending message (returns <code>false</code> for unknown / already-drained ids). <code>list()</code> snapshots pending items as <code>{ id, content, at }</code> for rendering removable chips — alongside <code>shift</code> / <code>clear</code> / <code>peek</code> / <code>size</code>.</p>
     </section>
 
     <section id="commands">
