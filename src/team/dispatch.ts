@@ -5,6 +5,7 @@
 
 import type { Tool, ToolContext } from '../tools/types.js'
 import type { BoardTask, TaskBoard } from './taskBoard.js'
+import type { BackgroundTaskManager } from '../background/manager.js'
 import { runTeamLoop } from './runner.js'
 
 type RunSubagent = (opts: {
@@ -20,11 +21,16 @@ export const dispatchTasks: Tool = {
     function: {
       name: 'dispatch_tasks',
       description:
-        'Execute the task board: spawn worker sub-agents for every pending, unblocked task (dependencies respected, run in parallel), looping until the board drains. Call this after creating tasks with task_create.',
+        'Execute the task board: spawn worker sub-agents for every pending, unblocked task (dependencies respected, run in parallel), looping until the board drains. Call this after creating tasks with task_create. Set background:true to return immediately and let the workers run while you keep control — then poll board_list/task_get to monitor and send_message to a running worker (worker:<taskId>) to redirect it mid-task.',
       parameters: {
         type: 'object',
         properties: {
           concurrency: { type: 'number', description: 'Max workers in parallel (default 3).' },
+          background: {
+            type: 'boolean',
+            description:
+              'Run the dispatch detached and return immediately (requires background tasks enabled). You stay free to monitor the board and message running workers while they work.',
+          },
         },
       },
     },
@@ -50,10 +56,34 @@ export const dispatchTasks: Tool = {
           'When done, your final message should report exactly what you did.',
       })
     }
-    const summary = await runTeamLoop(board, spawn, {
-      concurrency: typeof input.concurrency === 'number' ? input.concurrency : undefined,
-      signal: ctx.signal,
-    })
+    const concurrency = typeof input.concurrency === 'number' ? input.concurrency : undefined
+
+    // Background mode: kick the team loop off detached via the background task
+    // manager and return immediately, so the coordinator keeps control to poll
+    // the board and message running workers while they work.
+    if (input.background) {
+      const background = (ctx as { background?: BackgroundTaskManager }).background
+      if (!background) {
+        return {
+          content:
+            'background:true requires background tasks enabled (query({ background: true })).',
+          isError: true,
+        }
+      }
+      const pending = board.list({ status: 'pending' }).length
+      const taskId = background.start('dispatch team board', async (signal) => {
+        const s = await runTeamLoop(board, spawn, { concurrency, signal })
+        return `team dispatch finished — completed: ${s.completed.length}, failed: ${s.failed.length}, rounds: ${s.rounds}`
+      })
+      return {
+        content:
+          `Dispatched ${pending} task(s) in the background as ${taskId}. You keep control: ` +
+          `poll board_list / task_get to monitor, send_message to worker:<taskId> to redirect a running worker, ` +
+          `and task_output ${taskId} for the final summary.`,
+      }
+    }
+
+    const summary = await runTeamLoop(board, spawn, { concurrency, signal: ctx.signal })
     const lines = board.list().map((t) => `  ${t.id} [${t.status}] — ${t.subject}`)
     return {
       content:

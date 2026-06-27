@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.11.1
+- **`dispatch_tasks({ background: true })`** — runs the team loop detached (via the background task manager) and returns immediately with a `bg_<n>` id, so the coordinator keeps control to **monitor and steer workers while they run**: poll `board_list` / `task_get` for live status, `send_message` to `worker:<taskId>` to redirect a running worker mid-task (delivered on its next step), and `task_output <id>` for the final summary. Requires `query({ background: true })`. The default (foreground) dispatch is unchanged. Closes the interactive supervision loop on top of 0.11.0's push delivery. (Verified end-to-end: background dispatch → live `board_list` monitoring → redirect a running worker → worker picks it up and completes.)
+
 ### 0.11.0
 - **Push delivery to running agents (mailbox → transcript at the turn boundary).** Unread mailbox messages addressed to an agent are now auto-injected into its transcript at each turn boundary — the same delivery model as the message queue, but sourced from the shared mailbox and addressed by agent name. This means a coordinator (or any peer, or the host app, or another Web Worker via `BroadcastChannelMailbox`) can **dispatch a message to a *running* sub-agent and have it land on the sub-agent's next tool round** — no polling tool required. On by default when `team` is enabled; opt out with `query({ deliverTeamMessages: false })`.
 - **Addressable workers.** `dispatch_tasks` now names each spawned worker `worker:<taskId>` and records it as the task owner, so the coordinator can target a specific running worker with `send_message`. New `runSubagent({ name })` option + `deliverTeamMessages` on `query()`/`runAgent()`. Coordinator prompt updated to describe mid-task redirection.
