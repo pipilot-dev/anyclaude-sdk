@@ -12,14 +12,21 @@ export type AgentMessage = {
 }
 
 export class Mailbox {
-  private messages: AgentMessage[] = []
-  private counter = 0
+  protected messages: AgentMessage[] = []
+  protected counter = 0
 
   /** Deliver a message; returns the message id. */
   send(from: string, to: string, text: string): string {
     const id = `msg_${++this.counter}`
     this.messages.push({ id, from, to, text, ts: Date.now(), read: false })
     return id
+  }
+
+  /** Append a message produced elsewhere (e.g. another worker), de-duped by id.
+   *  Subclasses that sync over a transport use this for inbound messages. */
+  protected ingest(m: AgentMessage): void {
+    if (this.messages.some((x) => x.id === m.id)) return
+    this.messages.push(m)
   }
 
   /** Messages addressed to `agentId`, oldest first. */

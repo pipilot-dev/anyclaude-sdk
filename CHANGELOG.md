@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.10.0
+- **`BroadcastChannelMailbox`** — a `Mailbox` that gossips across execution contexts (Web Workers, browser tabs, Node `worker_threads`) over a `BroadcastChannel`. Drop-in for the in-memory `Mailbox`: `query({ team: true, mailbox: new BroadcastChannelMailbox({ channelName: 'team', origin: 'planner' }) })` and the existing `team` tools (`send_message` / `dispatch_tasks`) work **unchanged**, but messages now propagate to every agent on the same channel. This completes the multi-agent-in-separate-workers pattern: pair it with the existing `wrapWorker` / `exposeBackgroundWorker` (Comlink) for main→worker control. Uses the global `BroadcastChannel` by default; inject the `broadcast-channel` npm package (or any `ChannelLike`) via the `channel` option for cross-tab durability or older runtimes. Each instance keeps an eventually-consistent replica; ids are origin-scoped so workers never collide. Exported from the root and `anyclaude-sdk` `team` surface.
+
 ### 0.9.0
 Three agent-loop efficiency knobs (all opt-in, work in `query()` + `runToolLoop()`):
 - **Lean system prompt** — `query({ systemPromptPreset: 'lean' })` uses a ~70% shorter built-in prompt (verified 363 vs 1246 chars). On uncached endpoints that's paid back **every turn**. New `leanSystemPrompt` / `systemPromptFor` exports.

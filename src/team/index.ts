@@ -2,6 +2,11 @@
 // the coordinator uses to delegate, and the coordinator system-prompt addendum.
 
 export { Mailbox, type AgentMessage } from './mailbox.js'
+export {
+  BroadcastChannelMailbox,
+  type ChannelLike,
+  type BroadcastChannelMailboxOptions,
+} from './broadcast-mailbox.js'
 export { TaskBoard, type BoardTask, type TaskStatus } from './taskBoard.js'
 export {
   TEAM_TOOLS,

@@ -17,7 +17,7 @@
 import { uuid } from './util/ids.js'
 
 /** Bump on release so adoption can be bucketed by version. */
-export const TELEMETRY_SDK_VERSION = '0.7.1'
+export const TELEMETRY_SDK_VERSION = '0.10.0'
 
 export interface TelemetryOptions {
   /** Force-disable for this call (highest precedence besides the global opt-outs). */

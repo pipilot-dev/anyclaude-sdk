@@ -198,6 +198,26 @@ Optional off-main-thread execution via a Comlink worker harness
 query({ prompt, workspace, llm, agents: {}, background: true })
 ```
 
+### Agents in separate Web Workers
+
+Two halves: **Comlink** for main→worker control (`wrapWorker` / `exposeBackgroundWorker`,
+above), and **`BroadcastChannelMailbox`** so agents in *different* workers gossip
+mailbox-style. It's a drop-in `Mailbox`, so the existing `team` tools
+(`send_message` / `dispatch_tasks`) work unchanged across workers:
+
+```typescript
+import { BroadcastChannelMailbox } from 'anyclaude-sdk'
+
+// inside each Web Worker / tab / worker_thread, same channel name:
+const mailbox = new BroadcastChannelMailbox({ channelName: 'team', origin: 'planner' })
+query({ prompt, workspace, llm, team: true, mailbox })
+// messages sent by one worker land in the addressed agent's inbox in another.
+```
+
+Uses the global `BroadcastChannel` by default; pass `{ channel }` (e.g. the
+[`broadcast-channel`](https://www.npmjs.com/package/broadcast-channel) package)
+for cross-tab durability or older runtimes.
+
 ## Pluggable backends
 
 You aren't tied to WebContainer. A `Sandbox` is just a `FileSystem` plus a
