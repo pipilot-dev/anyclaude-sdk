@@ -62,6 +62,7 @@ import { DEFAULT_MAX_RESULT_CHARS, maybePersistLargeResult } from './persist.js'
 import { computeCostUSD, contextWindowFor } from './util/pricing.js'
 import { estimateTokens, summarizeHistory } from './compact.js'
 import { validateToolArguments } from './llm/repair.js'
+import { parseToolCalls } from './llm/dialects.js'
 import { uuid } from './util/ids.js'
 
 /** Wrap a single text prompt into the async-iterable form runAgent expects. */
@@ -447,6 +448,14 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
 
   const defs = toolDefs(tools)
   const byName = toolByName(tools)
+  // Stop streaming visible deltas once tool-call / reasoning markup begins (native
+  // dialects, <thinking>, or named-tag tools like <finish>); final text is cleaned.
+  const streamSuppressRe = (() => {
+    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const names = defs.map((d) => d.function.name).filter(Boolean).map(esc)
+    const named = names.length ? `|<(?:${names.join('|')})[\\s/>]` : ''
+    return new RegExp(`<tool_call|<function\\s*=|<thinking${named}`, 'i')
+  })()
 
   let system =
     options.systemPrompt != null ? options.systemPrompt : defaultSystemPrompt(cwd)
@@ -827,7 +836,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
               // Stop streaming once inline tool-call markup begins; it would
               // otherwise flood the UI with raw XML / file contents. The cleaned
               // text arrives with the final assistant message.
-              if (!inToolMarkup && /<tool_call|<function\s*=/.test(streamedText)) {
+              if (!inToolMarkup && streamSuppressRe.test(streamedText)) {
                 inToolMarkup = true
               }
               if (inToolMarkup) return
@@ -865,8 +874,16 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
       }
       apiMs += Date.now() - apiStart
 
-      const text = result.text || streamedText
-      const calls = result.toolCalls.length ? result.toolCalls : captured
+      let text = result.text || streamedText
+      let calls = result.toolCalls.length ? result.toolCalls : captured
+      // Loop-level safety net: recover inline tool calls (native dialects +
+      // named-tag tools like <finish>) a custom LLMClient left as text, and scrub
+      // leaked tool/reasoning markup so raw tags never reach the user.
+      if (!calls.length) {
+        const recovered = parseToolCalls(text, { toolNames: defs.map((d) => d.function.name) })
+        if (recovered.calls.length) calls = recovered.calls
+        text = recovered.cleanedText
+      }
       lastText = text || lastText
       resultModel = result.model || resultModel
       addUsageInto(usageTotal, result.usage)

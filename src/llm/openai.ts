@@ -153,11 +153,9 @@ export function createOpenAIClient(options: OpenAIClientOptions = {}): LLMClient
       // visible text. (Empty `dialects` — e.g. for native GPT/Claude — skips this.)
       let finalText = text
       if (!toolCalls.length && (!dialects || dialects.length)) {
-        const inline = parseToolCalls(text, { dialects })
-        if (inline.calls.length) {
-          toolCalls.push(...inline.calls)
-          finalText = inline.cleanedText
-        }
+        const inline = parseToolCalls(text, { dialects, toolNames: opts.tools?.map((t) => t.function.name) })
+        toolCalls.push(...inline.calls)
+        finalText = inline.cleanedText // also scrubs leaked control tags even when no call is found
       }
 
       if (toolCalls.length && opts.onTool) opts.onTool(toolCalls)

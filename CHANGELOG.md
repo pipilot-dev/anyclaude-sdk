@@ -8,6 +8,13 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.7.4
+- **Fix: raw tool-call / reasoning markup leaking into user-visible text.** When a model emitted a tool call in the named-tag dialect (`<finish>…</finish>`, the Cline/Roo/Aider convention) or left stray `<thinking>`/`<tool_call>`/`<function>`/`<parameter>` tags, the SDK didn't recognize them — so the raw tags rendered to the user and the tool never executed (the loop didn't terminate). Now:
+  - `parseToolCalls(text, { toolNames })` recovers **named-tag tool calls** scoped to the known tool set (`parseNamedTagToolCalls`), extracting both `<parameter=k>v</parameter>` and direct `<k>v</k>` children.
+  - `stripControlTags()` scrubs leaked `<thinking>…</thinking>` blocks and orphan tool-wrapper tags from visible text (conservative — only these well-known tags; ordinary prose like `a<b` is untouched).
+  - Both run as a **loop-level safety net** in `query()` and `runToolLoop()` on the final text, so the fix applies to **any** `LLMClient` (including custom gateways that bypass `createOpenAIClient`), not just the built-in client.
+  - Streaming delta suppression broadened to `<thinking>` + named-tool tags so markup never flickers mid-stream.
+
 ### 0.7.3
 - Telemetry: a second anonymous `run_end` event reports a **coarse token-volume bucket** (`tokenBucket`: `<1k` / `1k-10k` / `10k-100k` / `100k-1m` / `1m+`) — never an exact count, so a single run isn't fingerprintable — for adoption-volume stats. Same opt-outs apply. The collector also now tracks unique installs (anonymous id dedupe, never exposed) and per-day buckets.
 - New `scripts/adoption-report.mjs` — a **public-data** adoption report (GitHub code search for repos referencing the packages + repo metadata + npm weekly downloads), classifying public dependents by project kind. Collects nothing from user machines.

@@ -29,6 +29,7 @@ import type {
 import type { Tool, ToolContext } from './tools/types.js'
 import { toolByName, toolDefs } from './tools/index.js'
 import { validateToolArguments } from './llm/repair.js'
+import { parseToolCalls } from './llm/dialects.js'
 import { uuid } from './util/ids.js'
 
 export interface RunToolLoopOptions {
@@ -67,6 +68,14 @@ export interface RunToolLoopOptions {
    * Default `true`. Set `false` to pass raw args straight through.
    */
   repairToolCalls?: boolean
+}
+
+/** Regex that matches the onset of tool-call / reasoning markup in streamed text. */
+function buildSuppressRe(toolNames: string[]): RegExp {
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const names = toolNames.filter(Boolean).map(esc)
+  const named = names.length ? `|<(?:${names.join('|')})[\\s/>]` : ''
+  return new RegExp(`<tool_call|<function\\s*=|<thinking${named}`, 'i')
 }
 
 const emptyUsage = (): Usage => ({ input_tokens: 0, output_tokens: 0 })
@@ -149,6 +158,10 @@ export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDK
   const emitPartial = !!opts.includePartialMessages
   const byName = toolByName(tools)
   const defs = toolDefs(tools)
+  // Stop streaming visible deltas once tool-call / reasoning markup begins — the
+  // final cleaned text comes from the parsed result. Covers native dialects,
+  // <thinking>, and named-tag tools (e.g. <finish>) so they never flicker to the UI.
+  const suppressRe = buildSuppressRe(defs.map((d) => d.function.name))
 
   const startedAt = Date.now()
   let apiMs = 0
@@ -181,7 +194,7 @@ export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDK
           signal,
           onToken: (delta) => {
             streamedText += delta
-            if (!inToolMarkup && /<tool_call|<function\s*=/.test(streamedText)) inToolMarkup = true
+            if (!inToolMarkup && suppressRe.test(streamedText)) inToolMarkup = true
             if (inToolMarkup) return
             q.push({
               type: 'stream_event',
@@ -217,8 +230,16 @@ export async function* runToolLoop(opts: RunToolLoopOptions): AsyncGenerator<SDK
     }
     apiMs += Date.now() - apiStart
 
-    const text = result.text || streamedText
-    const calls = result.toolCalls.length ? result.toolCalls : captured
+    let text = result.text || streamedText
+    let calls = result.toolCalls.length ? result.toolCalls : captured
+    // Loop-level safety net: recover tool calls a (possibly custom) LLMClient left
+    // as inline text — native dialects + named-tag tools — and scrub leaked
+    // tool/reasoning markup so it never renders. Runs for ANY client, not just ours.
+    if (!calls.length) {
+      const recovered = parseToolCalls(text, { toolNames: defs.map((d) => d.function.name) })
+      if (recovered.calls.length) calls = recovered.calls
+      text = recovered.cleanedText
+    }
     lastText = text || lastText
     resultModel = result.model || resultModel
     addUsage(usageTotal, result.usage)

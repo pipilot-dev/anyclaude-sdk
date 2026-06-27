@@ -151,6 +151,71 @@ export const jsonFenceDialect: ToolDialect = {
   },
 }
 
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Extract params from a tool-tag body: both `<parameter=key>v</parameter>` and direct `<key>v</key>` children. */
+function parseTagParams(body: string): Record<string, unknown> {
+  const args: Record<string, unknown> = {}
+  const pRe = /<parameter\s*=\s*([^>\s]+)\s*>([\s\S]*?)(?:<\/parameter>|<parameter\s*=|$)/gi
+  let m: RegExpExecArray | null
+  while ((m = pRe.exec(body)) !== null) args[m[1].trim()] = trimEdges(m[2])
+  const tRe = /<([a-zA-Z_][\w-]*)\s*>([\s\S]*?)<\/\1>/g
+  while ((m = tRe.exec(body)) !== null) {
+    const k = m[1]
+    if (k === 'parameter' || k in args) continue
+    args[k] = trimEdges(m[2])
+  }
+  return args
+}
+
+/**
+ * Named-tag tool calls (the Cline/Roo/Aider convention): a tool invoked as
+ * `<tool_name><param>value</param></tool_name>` (or `<tool_name/>`). Scoped to
+ * the KNOWN tool names so ordinary markup the model writes isn't misread. This
+ * is what leaks as raw `<finish>…</finish>` text when a model emulates a custom
+ * tool format and the SDK doesn't recognize it.
+ */
+export function parseNamedTagToolCalls(
+  text: string,
+  toolNames: string[],
+  idBase = 0
+): ParsedToolCalls {
+  if (!text || !toolNames?.length) return { calls: [], cleanedText: text }
+  let best = { idx: -1, name: '', after: -1 }
+  for (const name of toolNames) {
+    const re = new RegExp('<' + escapeRe(name) + '(?:\\s[^>]*)?/?>', 'i')
+    const m = re.exec(text)
+    if (m && (best.idx < 0 || m.index < best.idx)) best = { idx: m.index, name, after: m.index + m[0].length }
+  }
+  if (best.idx < 0) return { calls: [], cleanedText: text }
+  const closer = new RegExp('</' + escapeRe(best.name) + '>', 'i')
+  const rest = text.slice(best.after)
+  const cm = closer.exec(rest)
+  const body = cm ? rest.slice(0, cm.index) : rest
+  const args = parseTagParams(body)
+  return {
+    calls: [{ id: `call_inline_${idBase}`, type: 'function', function: { name: best.name, arguments: JSON.stringify(args) } }],
+    cleanedText: text.slice(0, best.idx).trim(),
+  }
+}
+
+/**
+ * Remove leaked reasoning / tool-wrapper markup from user-visible text:
+ * `<thinking>…</thinking>` blocks and orphan `<tool_call>` / `<function…>` /
+ * `<parameter…>` tags that a model emitted as prose. Conservative — only these
+ * well-known control tags, which essentially never appear in legitimate output.
+ */
+export function stripControlTags(text: string): string {
+  if (!text || text.indexOf('<') < 0) return text
+  return text
+    .replace(/<thinking\s*>[\s\S]*?<\/thinking\s*>/gi, '')
+    .replace(/<\/?(?:thinking|tool_call|function|parameter|antml:[a-z_]+)(?:\s[^>]*|=[^>]*)?\/?>/gi, '')
+    .replace(/[ \t]+(\r?\n)/g, '$1')
+    .trim()
+}
+
 /** All built-in dialects, keyed by name. */
 export const dialects: Record<string, ToolDialect> = {
   'xml-function': xmlFunctionDialect,
@@ -167,7 +232,7 @@ export const DEFAULT_DIALECTS = ['xml-function', 'hermes', 'json-fence']
  */
 export function parseToolCalls(
   text: string,
-  opts: { dialects?: string[]; idBase?: number } = {}
+  opts: { dialects?: string[]; idBase?: number; toolNames?: string[] } = {}
 ): ParsedToolCalls {
   if (!text) return { calls: [], cleanedText: text }
   const order = opts.dialects ?? DEFAULT_DIALECTS
@@ -175,9 +240,16 @@ export function parseToolCalls(
     const d = dialects[name]
     if (!d || !d.test(text)) continue
     const parsed = d.parse(text, opts.idBase ?? 0)
-    if (parsed.calls.length) return parsed
+    if (parsed.calls.length) return { calls: parsed.calls, cleanedText: stripControlTags(parsed.cleanedText) }
   }
-  return { calls: [], cleanedText: text }
+  // Named-tag fallback (e.g. `<finish>…</finish>`) — scoped to known tool names.
+  if (opts.toolNames?.length) {
+    const named = parseNamedTagToolCalls(text, opts.toolNames, opts.idBase ?? 0)
+    if (named.calls.length) return { calls: named.calls, cleanedText: stripControlTags(named.cleanedText) }
+  }
+  // No tool call recognized — still scrub any leaked control/reasoning markup so
+  // raw tags never render to the user.
+  return { calls: [], cleanedText: stripControlTags(text) }
 }
 
 /** True if ANY of the given dialects (default: all) detects tool-call markup. */
