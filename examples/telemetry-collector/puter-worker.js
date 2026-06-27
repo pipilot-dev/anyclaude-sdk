@@ -58,6 +58,36 @@ router.post('/', async ({ request }) => {
   return new Response(null, { status: 204, headers: CORS })
 })
 
+// Owner-only: wipe all collector counters. Call via puter.workers.exec() (which
+// injects the caller's auth as `user`); authorized only when the caller is the
+// worker owner. A plain public POST has no `user` and is rejected.
+router.post('/__reset', async () => {
+  let authorized = false
+  try {
+    if (typeof user !== 'undefined' && user?.puter?.whoami && me?.puter?.whoami) {
+      const [m, u] = await Promise.all([me.puter.whoami(), user.puter.whoami()])
+      authorized = !!(m && u && m.uuid === u.uuid)
+    }
+  } catch {
+    /* not authorized */
+  }
+  if (!authorized) return new Response('forbidden', { status: 403, headers: CORS })
+  let n = 0
+  try {
+    const keys = await me.puter.kv.list(PREFIX + '*')
+    for (const k of keys || []) {
+      const key = typeof k === 'string' ? k : (k.key ?? k.name)
+      if (key) {
+        await me.puter.kv.del(key)
+        n++
+      }
+    }
+  } catch (e) {
+    return new Response('err: ' + String(e), { status: 500, headers: CORS })
+  }
+  return new Response(JSON.stringify({ reset: n }), { status: 200, headers: { ...CORS, 'content-type': 'application/json' } })
+})
+
 router.get('/', async () => {
   const out = {}
   try {
