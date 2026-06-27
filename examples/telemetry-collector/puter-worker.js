@@ -34,7 +34,8 @@ router.post('/', async ({ request }) => {
   const event = typeof body?.event === 'string' ? body.event : ''
   if (!ALLOWED_EVENTS.has(event)) return new Response(null, { status: 204, headers: CORS })
 
-  const keys = [`event:${event}`, 'event:total']
+  const day = new Date().toISOString().slice(0, 10) // UTC date bucket for trends
+  const keys = [`event:${event}`, 'event:total', `day:${day}`]
   for (const [field, max] of Object.entries(STRING_FIELDS)) {
     const v = body[field]
     if (typeof v === 'string' && v) keys.push(`${field}:${v.slice(0, max).replace(/[^\w.\-]/g, '')}`)
@@ -43,6 +44,17 @@ router.post('/', async ({ request }) => {
     if (body[field] === true) keys.push(`feature:${field}`)
   }
   await Promise.all(keys.map((k) => me.puter.kv.incr(PREFIX + k)))
+
+  // Unique-install count: dedupe on the anonymous install id via a marker key.
+  // The marker (and the id) is NEVER returned by GET — only the count is.
+  const id = typeof body.install === 'string' ? body.install.slice(0, 64).replace(/[^\w-]/g, '') : ''
+  if (id) {
+    const seenKey = PREFIX + 'seen:' + id
+    if (!(await me.puter.kv.get(seenKey))) {
+      await me.puter.kv.set(seenKey, '1')
+      await me.puter.kv.incr(PREFIX + 'installs:unique')
+    }
+  }
   return new Response(null, { status: 204, headers: CORS })
 })
 
@@ -52,7 +64,9 @@ router.get('/', async () => {
     const entries = await me.puter.kv.list(PREFIX + '*', true)
     for (const e of entries || []) {
       const key = (e.key ?? e.name ?? '').slice(PREFIX.length)
-      if (key) out[key] = Number(e.value) || 0
+      // Never expose the per-install dedupe markers (they hold the anonymous id).
+      if (!key || key.startsWith('seen:')) continue
+      out[key] = Number(e.value) || 0
     }
   } catch {
     /* empty */
