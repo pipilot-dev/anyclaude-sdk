@@ -99,6 +99,10 @@ export interface QueryOptions {
   board?: import('./team/index.js').TaskBoard
   /** This agent's name/label for messaging (default 'coordinator'). */
   agentName?: string
+  /** Auto-deliver unread mailbox messages addressed to this agent into the
+   *  transcript at each turn boundary (push delivery, like the message queue).
+   *  Default true when `team` is enabled. */
+  deliverTeamMessages?: boolean
   /** Persist the transcript to this store (keyed by sessionId) for resume. */
   sessionStore?: SessionStoreLike
   /** Load the stored transcript for sessionId before the first turn. */
@@ -186,6 +190,7 @@ export function query(options: QueryOptions): Query {
     includePartialMessages: options.includePartialMessages,
     team: options.team,
     mailbox: options.mailbox,
+    deliverTeamMessages: options.deliverTeamMessages,
     board: options.board,
     agentName: options.agentName,
     sessionStore: options.sessionStore,

@@ -42,6 +42,10 @@ export interface ToolContext {
     description: string
     prompt: string
     agentType?: string
+    /** Unique name for this sub-agent in the shared mailbox, so peers can
+     *  address messages to this specific running worker. Defaults to the
+     *  agentType (or 'worker'). */
+    name?: string
     /** Abort signal (e.g. a background task's stop) — cancels the sub-agent. */
     signal?: AbortSignal
     /** Streamed progress (assistant text + tool names) as the sub-agent works. */

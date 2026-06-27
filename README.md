@@ -224,6 +224,20 @@ const mailbox = await BroadcastChannelMailbox.crossTab({ channelName: 'team', or
 query({ prompt, workspace, llm, team: true, mailbox })
 ```
 
+**Push delivery to a running agent.** Messages addressed to an agent are
+auto-injected into its transcript at the next turn boundary — same model as the
+message queue, but from the shared mailbox. So a coordinator (or peer, or another
+worker) can redirect a **running** sub-agent mid-task and it lands on the
+sub-agent's next tool round, no polling tool needed. `dispatch_tasks` names each
+worker `worker:<taskId>` so you can target a specific one:
+
+```typescript
+mailbox.send('coordinator', 'worker:task_1', 'while you work: also add logging')
+// worker:task_1 sees "[Team messages] - from coordinator: ..." on its next step.
+```
+
+On by default with `team: true`; opt out via `query({ deliverTeamMessages: false })`.
+
 ## Pluggable backends
 
 You aren't tied to WebContainer. A `Sandbox` is just a `FileSystem` plus a

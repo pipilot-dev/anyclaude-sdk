@@ -193,6 +193,11 @@ export interface AgentOptions {
   board?: TaskBoard
   /** This agent's name/label for messaging (default 'coordinator'). */
   agentName?: string
+  /** Auto-deliver unread mailbox messages addressed to this agent into the
+   *  transcript at each turn boundary (push delivery, like the message queue).
+   *  Default true when `team` is enabled. Set false to require an explicit
+   *  pull instead. */
+  deliverTeamMessages?: boolean
   /** Persist the transcript to this store (keyed by sessionId) for resume. */
   sessionStore?: SessionStoreLike
   /** Load the stored transcript for sessionId before the first turn. */
@@ -413,6 +418,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
   const mailbox = teamEnabled ? options.mailbox ?? new Mailbox() : undefined
   const board = teamEnabled ? options.board ?? new TaskBoard() : undefined
   const agentName = options.agentName ?? 'coordinator'
+  const deliverTeamMessages = options.deliverTeamMessages ?? true
 
   let localTools =
     subagentsEnabled && !baseTools.some((t) => t.def.function.name === 'task')
@@ -548,7 +554,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
   // Wire sub-agent spawning. Each call runs a fresh, isolated runAgent to
   // completion and returns only its final text.
   if (subagentsEnabled) {
-    ctx.runSubagent = async ({ prompt: subPrompt, agentType, signal: subSignal, onProgress }) => {
+    ctx.runSubagent = async ({ prompt: subPrompt, agentType, name: subName, signal: subSignal, onProgress }) => {
       const def = agentType ? agents?.[agentType] : undefined
       const subSystem = def?.prompt ?? defaultSubagentPrompt(cwd)
       const subTools = def?.tools
@@ -592,7 +598,8 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
         team: teamEnabled,
         mailbox,
         board,
-        agentName: agentType || 'worker',
+        deliverTeamMessages,
+        agentName: subName || agentType || 'worker',
         memory,
         skills,
       })
@@ -824,6 +831,31 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
           yield {
             type: 'user',
             message: { role: 'user', content: queued.content },
+            parent_tool_use_id: null,
+            timestamp: new Date().toISOString(),
+            uuid: uuid(),
+            session_id: sessionId,
+          }
+        }
+      }
+
+      // Team mailbox: push unread messages addressed to THIS agent into the
+      // transcript at the turn boundary — same delivery model as the queue, but
+      // sourced from the shared mailbox. This lets a coordinator (or any peer)
+      // dispatch a message to a *running* sub-agent and have it land on the
+      // sub-agent's next tool round, no polling tool required. Cross-worker too:
+      // a BroadcastChannelMailbox replicates the message before it's drained.
+      if (mailbox && deliverTeamMessages) {
+        const unread = mailbox.inbox(agentName, { unreadOnly: true })
+        if (unread.length) {
+          mailbox.markRead(agentName)
+          const body =
+            '[Team messages]\n' +
+            unread.map((m) => `- from ${m.from}: ${m.text}`).join('\n')
+          history.push({ role: 'user', content: body })
+          yield {
+            type: 'user',
+            message: { role: 'user', content: body },
             parent_tool_use_id: null,
             timestamp: new Date().toISOString(),
             uuid: uuid(),

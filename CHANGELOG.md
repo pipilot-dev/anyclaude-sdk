@@ -8,6 +8,10 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.11.0
+- **Push delivery to running agents (mailbox → transcript at the turn boundary).** Unread mailbox messages addressed to an agent are now auto-injected into its transcript at each turn boundary — the same delivery model as the message queue, but sourced from the shared mailbox and addressed by agent name. This means a coordinator (or any peer, or the host app, or another Web Worker via `BroadcastChannelMailbox`) can **dispatch a message to a *running* sub-agent and have it land on the sub-agent's next tool round** — no polling tool required. On by default when `team` is enabled; opt out with `query({ deliverTeamMessages: false })`.
+- **Addressable workers.** `dispatch_tasks` now names each spawned worker `worker:<taskId>` and records it as the task owner, so the coordinator can target a specific running worker with `send_message`. New `runSubagent({ name })` option + `deliverTeamMessages` on `query()`/`runAgent()`. Coordinator prompt updated to describe mid-task redirection.
+
 ### 0.10.2
 - **`broadcast-channel` is now a real dependency** (promoted from optional peer) and **`BroadcastChannelMailbox.crossTab()`** wires it up in one call: a durable cross-tab/cross-context mailbox (IndexedDB/localStorage fallbacks, older browsers + Node) without the caller importing the package. `const mb = await BroadcastChannelMailbox.crossTab({ channelName: 'team', origin: 'planner' }); query({ team: true, mailbox: mb })`. The package is lazy-imported inside `crossTab()`, so bundles that never call it don't pull it in. The plain `new BroadcastChannelMailbox()` (global `BroadcastChannel`) path is unchanged.
 

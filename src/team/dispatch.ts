@@ -11,6 +11,7 @@ type RunSubagent = (opts: {
   description: string
   prompt: string
   agentType?: string
+  name?: string
 }) => Promise<{ text: string; isError?: boolean }>
 
 export const dispatchTasks: Tool = {
@@ -34,13 +35,21 @@ export const dispatchTasks: Tool = {
     if (!board || !runSubagent) {
       return { content: 'Teammates/sub-agents are not enabled for this session.', isError: true }
     }
-    const spawn = (task: BoardTask) =>
-      runSubagent({
+    const spawn = (task: BoardTask) => {
+      // Give each worker a unique, addressable name and reflect it as the task
+      // owner, so the coordinator can dispatch a message to this specific
+      // running worker (delivered on its next tool round via the mailbox).
+      const name = `worker:${task.id}`
+      board.update(task.id, { owner: name })
+      return runSubagent({
         description: task.subject,
+        name,
         prompt:
-          `Complete this task:\n# ${task.subject}\n${task.description ?? ''}\n\n` +
+          `You are teammate "${name}". Complete this task:\n# ${task.subject}\n${task.description ?? ''}\n\n` +
+          'New instructions from the coordinator may arrive mid-task as `[Team messages]` — adapt when they do. ' +
           'When done, your final message should report exactly what you did.',
       })
+    }
     const summary = await runTeamLoop(board, spawn, {
       concurrency: typeof input.concurrency === 'number' ? input.concurrency : undefined,
       signal: ctx.signal,
