@@ -8,6 +8,10 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.7.3
+- Telemetry: a second anonymous `run_end` event reports a **coarse token-volume bucket** (`tokenBucket`: `<1k` / `1k-10k` / `10k-100k` / `100k-1m` / `1m+`) — never an exact count, so a single run isn't fingerprintable — for adoption-volume stats. Same opt-outs apply. The collector also now tracks unique installs (anonymous id dedupe, never exposed) and per-day buckets.
+- New `scripts/adoption-report.mjs` — a **public-data** adoption report (GitHub code search for repos referencing the packages + repo metadata + npm weekly downloads), classifying public dependents by project kind. Collects nothing from user machines.
+
 ### 0.7.2
 - README/docs refresh: corrected the Telemetry section (it now describes the default aggregate-only collector instead of the stale "no-op unless configured"), and added sections for the Claude-Code router (`anyclaude-sdk/anthropic-endpoint`), reliable tool use (dialects/profiles/repair), `create-anyclaude-app`, the live compaction marker, and `MessageQueue.remove`. No code changes.
 

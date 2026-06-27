@@ -19,7 +19,7 @@ import type { SlashCommand } from './commands/index.js'
 import type { SessionStoreLike } from './session/index.js'
 import type { MemoryStore } from './memory/index.js'
 import { runAgent, type Workspace } from './agent.js'
-import { track, telemetryEnabled, type TelemetryOptions } from './telemetry.js'
+import { track, telemetryEnabled, tokenBucket, type TelemetryOptions } from './telemetry.js'
 import { profileForModel } from './llm/profiles.js'
 
 export interface QueryOptions {
@@ -186,20 +186,21 @@ export function query(options: QueryOptions): Query {
     skills: options.skills,
   }) as Query
 
-  gen.interrupt = () => abortController.abort()
-
-  // Anonymous, aggregate adoption signal — one event per public run. Fire-and-forget,
-  // never blocks the generator, no-ops unless enabled + a collector is configured.
-  // Only booleans + a coarse model-family bucket leave the process (see telemetry.ts).
+  // Anonymous, aggregate adoption signal. Fire-and-forget, never blocks, no-ops
+  // unless enabled + a collector is configured. Only booleans + coarse buckets
+  // (model family, token-volume bucket) ever leave the process — see telemetry.ts.
   const telemetry: TelemetryOptions = {
     disabled: options.disableTelemetry,
     ...options.telemetry,
   }
-  if (telemetryEnabled(telemetry)) {
+  const modelFamily = profileForModel(options.model).name
+  const enabled = telemetryEnabled(telemetry)
+
+  if (enabled) {
     track(
       'run',
       {
-        model_family: profileForModel(options.model).name,
+        model_family: modelFamily,
         client_workspace_tools: !!options.clientWorkspaceTools,
         client_tools: !!options.clientTools?.length,
         survivor: options.maxDurationMs != null,
@@ -216,7 +217,29 @@ export function query(options: QueryOptions): Query {
     )
   }
 
-  return gen
+  if (!enabled) {
+    gen.interrupt = () => abortController.abort()
+    return gen
+  }
+
+  // Wrap to emit one `run_end` with a coarse token-volume bucket when the run
+  // finishes (tokens aren't known until the `result` message). Pass-through only.
+  const wrapped = (async function* () {
+    let totalTokens = 0
+    try {
+      for await (const m of gen) {
+        if (m.type === 'result' && (m as { usage?: { input_tokens?: number; output_tokens?: number } }).usage) {
+          const u = (m as { usage: { input_tokens?: number; output_tokens?: number } }).usage
+          totalTokens = (u.input_tokens || 0) + (u.output_tokens || 0)
+        }
+        yield m
+      }
+    } finally {
+      track('run_end', { model_family: modelFamily, tokens_bucket: tokenBucket(totalTokens) }, telemetry)
+    }
+  })() as Query
+  wrapped.interrupt = () => abortController.abort()
+  return wrapped
 }
 
 /** Wrap a single text prompt into the async-iterable form runAgent expects. */

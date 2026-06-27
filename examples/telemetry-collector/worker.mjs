@@ -15,8 +15,8 @@
 // Point the SDK at it:  ANYCLAUDE_TELEMETRY_URL=https://your-collector/  (or query({ telemetry: { url } }))
 
 // Only these fields are ever read off an event; everything else is ignored.
-const ALLOWED_EVENTS = new Set(['run'])
-const STRING_FIELDS = { runtime: 12, sdk_version: 16, model_family: 24 }
+const ALLOWED_EVENTS = new Set(['run', 'run_end'])
+const STRING_FIELDS = { runtime: 12, sdk_version: 16, model_family: 24, tokens_bucket: 10 }
 const BOOL_FIELDS = [
   'client_workspace_tools', 'client_tools', 'survivor', 'mcp', 'team',
   'background', 'auto_compact', 'skills', 'sessions', 'partial_messages', 'resumed',

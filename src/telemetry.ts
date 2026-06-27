@@ -34,7 +34,17 @@ const DEFAULT_TELEMETRY_URL = 'https://anyclaude-telemetry.puter.work'
 // Only these prop keys are ever transmitted, and only with safe value types.
 // Booleans pass through; these specific string keys pass through as-is (they are
 // coarse buckets we set ourselves — never free-form / user data).
-const ALLOWED_STRING_KEYS = new Set(['model_family', 'event_detail'])
+const ALLOWED_STRING_KEYS = new Set(['model_family', 'event_detail', 'tokens_bucket'])
+
+/** Coarse token-volume bucket — never an exact count, so a single run isn't fingerprintable. */
+export function tokenBucket(total: number): string {
+  if (!Number.isFinite(total) || total <= 0) return '0'
+  if (total < 1_000) return '<1k'
+  if (total < 10_000) return '1k-10k'
+  if (total < 100_000) return '10k-100k'
+  if (total < 1_000_000) return '100k-1m'
+  return '1m+'
+}
 
 function readEnv(name: string): string | undefined {
   const p = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
