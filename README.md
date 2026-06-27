@@ -386,6 +386,20 @@ npm create anyclaude-app@latest my-app   # template: bolt — WebContainer + cha
 
 The `bolt` template wires `useWebContainerPreview({ wc })` (boot a dev server → live preview URL) + a browser-side `query()` + the IDE components. See [`anyclaude-react`](#react-ui-kit--anyclaude-react).
 
+## Token efficiency — deferred tools
+
+Keep a large pool of rarely-used tools **out of the per-turn payload** (big savings on weak/uncached models) while staying discoverable + callable. Mark them deferred; `tool_search` indexes them and the loop **arms** a tool (sends its schema on subsequent turns) once search surfaces it — then it executes normally.
+
+```ts
+query({ prompt, workspace, llm,
+  extraTools: [deploy, ...integrationTools],   // e.g. 35 integration tools
+  deferredTools: ['stripe_charge', 'supabase_query', /* … the niche ones */],
+})
+// or per-tool: defineTool({ name, description, parameters, run, defer: true })
+```
+
+Only the lean core + `tool_search` are sent each turn; the model searches when it needs a niche tool, the SDK arms it, and the call goes through. Register 35, send ~10.
+
 ## Other niceties
 
 - **Live compaction marker** — `autoCompact` emits a `compact_boundary` with `status: 'start'` *before* summarizing (for a live "compacting…" shimmer) and `status: 'end'` after with `post_tokens`.
@@ -402,7 +416,7 @@ Runnable Vite projects in [`examples/`](examples/): **`browser-ide`** (WebContai
   - `prompt: string | AsyncIterable<SDKUserMessage>`
   - `workspace: FileSystem & CommandExecutor`
   - `llm: LLMClient`
-  - `tools?`, `extraTools?`, `allowedTools?`/`disallowedTools?`, `model?`, `systemPrompt?`/`appendSystemPrompt?`, `maxTurns?` (default 50), `cwd?`, `abortController?`
+  - `tools?`, `extraTools?`, `allowedTools?`/`disallowedTools?`, `deferredTools?` (lazy-load), `model?`, `systemPrompt?`/`appendSystemPrompt?`, `maxTurns?` (default 50), `cwd?`, `abortController?`
   - serverless: `sessionStore?`, `resume?`, `maxDurationMs?`, `continueRun?`
   - client tools: `clientTools?`, `clientToolResults?`; interactive: `onAskUser?`
   - also: `mcpServers?`, `agents?`, `commands?`, `hooks?`, `background?`, `team?`, `memory?`, `permissionMode?`/`canUseTool?`, `messageQueue?`

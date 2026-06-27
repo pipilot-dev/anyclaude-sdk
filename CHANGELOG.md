@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.8.1
+- docs(readme): document deferred tools (token-efficiency section + API option). No code change.
+
 ### 0.8.0
 - **Deferred tools (lazy tool loading)** — keep a large pool of rarely-used tools OUT of the per-turn payload (big token savings, esp. on weak/uncached models) while staying discoverable and callable. Mark via `query({ deferredTools: ['stripe_charge', …] })` or per-tool `defineTool({ defer: true })`. Deferred tools aren't sent to the model, but `tool_search` indexes them; when it surfaces one, the loop **arms** it (its schema is included on subsequent turns) and it executes normally. New `ToolContext.armTools(names)`. Mirrors Anthropic's tool-search `defer_loading` pattern — register 35 integration tools, send ~10.
 
