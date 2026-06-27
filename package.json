@@ -1,6 +1,6 @@
 {
   "name": "anyclaude-sdk",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "Standalone, browser-compatible SDK providing Claude Code agent capabilities (tools, tool loop, multi-turn, MCP, sub-agents, sessions) against any OpenAI/Anthropic-compatible LLM endpoint. Runs in the browser (WebContainer), Node, and Bun — no backend required.",
   "type": "module",
   "main": "./dist/index.js",
@@ -114,16 +114,23 @@
   "bugs": {
     "url": "https://github.com/pipilot-dev/anyclaude-sdk/issues"
   },
+  "dependencies": {
+    "comlink": "^4.4.2"
+  },
   "peerDependencies": {
     "@cloudflare/sandbox": "*",
     "@daytonaio/sdk": "*",
     "@vercel/sandbox": "*",
     "@webcontainer/api": ">=1.1.0",
+    "broadcast-channel": ">=4.0.0",
     "dexie": ">=3.2.0",
     "e2b": "*"
   },
   "peerDependenciesMeta": {
     "@webcontainer/api": {
+      "optional": true
+    },
+    "broadcast-channel": {
       "optional": true
     },
     "dexie": {
@@ -144,7 +151,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
-    "comlink": "^4.4.2",
+    "broadcast-channel": "^7.0.0",
     "dexie": "^4.4.4",
     "typescript": "^5.4.0"
   }

@@ -8,6 +8,10 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.10.1
+- **fix(background): comlink now ships with the SDK.** The Comlink worker harness (`wrapWorker` / `exposeBackgroundWorker`) lazy-imports `comlink`, but it was a *devDependency* — so it worked in this repo yet threw `Cannot find module 'comlink'` for anyone who `npm i anyclaude-sdk` and used a worker. Moved `comlink` to **`dependencies`** so the worker path works zero-config. Still lazy-imported behind `await import` with `sideEffects: false`, so bundlers don't pull it into browser bundles unless `wrapWorker` is actually used. (Verified the harness end-to-end: a main-thread `wrapWorker(...).run()` executes inside a real worker and returns.)
+- **`broadcast-channel` added as an optional peer dependency.** `BroadcastChannelMailbox` defaults to the global `BroadcastChannel` (browsers + Node ≥15) and needs no package; install `broadcast-channel` only for the injected cross-tab / legacy-runtime path.
+
 ### 0.10.0
 - **`BroadcastChannelMailbox`** — a `Mailbox` that gossips across execution contexts (Web Workers, browser tabs, Node `worker_threads`) over a `BroadcastChannel`. Drop-in for the in-memory `Mailbox`: `query({ team: true, mailbox: new BroadcastChannelMailbox({ channelName: 'team', origin: 'planner' }) })` and the existing `team` tools (`send_message` / `dispatch_tasks`) work **unchanged**, but messages now propagate to every agent on the same channel. This completes the multi-agent-in-separate-workers pattern: pair it with the existing `wrapWorker` / `exposeBackgroundWorker` (Comlink) for main→worker control. Uses the global `BroadcastChannel` by default; inject the `broadcast-channel` npm package (or any `ChannelLike`) via the `channel` option for cross-tab durability or older runtimes. Each instance keeps an eventually-consistent replica; ids are origin-scoped so workers never collide. Exported from the root and `anyclaude-sdk` `team` surface.
 
