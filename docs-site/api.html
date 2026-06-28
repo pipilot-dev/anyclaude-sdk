@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.9.0 · MIT</div>
+    <div class="brand-sub">v0.11.2 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
@@ -121,6 +121,7 @@ for await (const msg of q) {
         <tr><td><code>team</code></td><td>boolean</td><td>Teammate coordination (mailbox + board + coordinator prompt).</td></tr>
         <tr><td><code>mailbox</code> / <code>board</code></td><td>Mailbox / TaskBoard</td><td>Inject shared instances so they persist across turns.</td></tr>
         <tr><td><code>agentName</code></td><td>string</td><td>This agent's name for messaging. Default 'coordinator'.</td></tr>
+        <tr><td><code>deliverTeamMessages</code></td><td>boolean</td><td>Auto-inject unread mailbox messages addressed to this agent at each turn boundary (push delivery). Default true when <code>team</code> is on.</td></tr>
         <tr><td><code>messageQueue</code></td><td>MessageQueue</td><td>Interject user messages mid-run (one per turn boundary).</td></tr>
       </table>
 

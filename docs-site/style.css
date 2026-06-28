@@ -53,6 +53,7 @@ p { max-width: 760px; }
   background: linear-gradient(120deg, #fff 30%, var(--accent) 75%, var(--accent-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero .tag { font-size: 19px; color: var(--muted); max-width: 720px; }
 .pill { display: inline-flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--border); color: var(--muted); padding: 5px 12px; border-radius: 999px; font-size: 12.5px; font-family: var(--mono); }
+.badge { display: inline-block; background: rgba(77,208,225,.12); border: 1px solid var(--accent); color: var(--accent); padding: 1px 8px; border-radius: 999px; font-size: 11px; font-family: var(--mono); vertical-align: middle; margin-right: 6px; }
 .btns { display: flex; flex-wrap: wrap; gap: 12px; margin: 26px 0 8px; }
 .btn { display: inline-flex; align-items: center; gap: 8px; padding: 11px 18px; border-radius: 10px; font-weight: 600; font-size: 14.5px; border: 1px solid var(--border); }
 .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #07101a; border: none; }

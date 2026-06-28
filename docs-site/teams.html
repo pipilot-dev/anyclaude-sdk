@@ -15,7 +15,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.9.0 · MIT</div>
+    <div class="brand-sub">v0.11.2 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
@@ -115,13 +115,44 @@ await query({
 
       <h3>Coordinator tools</h3>
       <div class="cards">
-        <div class="card"><h4><code>send_message</code></h4><p><code>{ to, text }</code> — message a teammate via the shared mailbox.</p></div>
+        <div class="card"><h4><code>send_message</code></h4><p><code>{ to, text }</code> — message a teammate via the shared mailbox. Addressed to a <b>running</b> worker (<code>worker:&lt;taskId&gt;</code>), it's delivered on that worker's next step — see push delivery below.</p></div>
         <div class="card"><h4><code>task_create</code></h4><p><code>{ subject, description?, owner?, blocked_by? }</code> — add a board task; gate it on prerequisite task ids.</p></div>
         <div class="card"><h4><code>task_update</code></h4><p><code>{ id, status?, owner?, subject?, description? }</code> — status is <code>pending|in_progress|completed|failed</code>.</p></div>
         <div class="card"><h4><code>task_get</code></h4><p><code>{ id }</code> — full detail for one task (incl. blocked/blocks).</p></div>
         <div class="card"><h4><code>board_list</code></h4><p><code>{ status?, owner? }</code> — list board tasks, optionally filtered.</p></div>
-        <div class="card"><h4><code>dispatch_tasks</code></h4><p>Hand ready (unblocked) board tasks to workers in parallel and collect results.</p></div>
+        <div class="card"><h4><code>dispatch_tasks</code></h4><p>Hand ready (unblocked) board tasks to workers in parallel and collect results. Each worker is named <code>worker:&lt;taskId&gt;</code> (and recorded as the task owner). Pass <code>{ background: true }</code> to return immediately and supervise while they run.</p></div>
       </div>
+    </section>
+
+    <section id="push">
+      <h2><i data-lucide="send"></i> Push delivery to running agents</h2>
+      <p><span class="badge">0.11</span> Unread mailbox messages addressed to an agent are auto-injected into its transcript at each turn boundary — the same delivery model as the message queue, but sourced from the shared mailbox and addressed by name. So a coordinator (or any peer, the host app, or another Web Worker) can <b>dispatch a message to a running sub-agent and have it land on the sub-agent's next tool round</b> — no polling tool required.</p>
+      <div class="code"><pre><code class="language-ts">// any sender — coordinator, peer, host app, or another worker
+mailbox.send('coordinator', 'worker:task_1', 'while you work: also add logging')
+// worker:task_1 sees "[Team messages] - from coordinator: …" on its next step.</code></pre></div>
+      <p>On by default when <code>team: true</code>; opt out with <code>query({ deliverTeamMessages: false })</code> for explicit pull instead.</p>
+
+      <h3>Supervise &amp; redirect while workers run</h3>
+      <p>Combine background dispatch + push delivery to monitor and steer live: kick the board off detached, then poll the board and message a specific running worker mid-task.</p>
+      <div class="code"><pre><code class="language-ts">await query({ prompt, workspace, llm, agents: {}, team: true, background: true, mailbox, board })
+// The coordinator: task_create … → dispatch_tasks({ background: true }) → returns a bg id,
+// then board_list / task_get to monitor, and send_message to worker:&lt;taskId&gt; to redirect —
+// the worker picks it up on its next step. (Pace your polling; don't busy-loop.)</code></pre></div>
+    </section>
+
+    <section id="workers-anywhere">
+      <h2><i data-lucide="boxes"></i> Teams across Web Workers / tabs</h2>
+      <p><span class="badge">0.10</span> The in-memory <code>Mailbox</code> is single-context. <b><code>BroadcastChannelMailbox</code></b> is a drop-in replacement that gossips over a <code>BroadcastChannel</code>, so agents in <i>different</i> Web Workers (or browser tabs, or Node <code>worker_threads</code>) share one mailbox — the same <code>team</code> tools work unchanged across workers. Pair it with the Comlink helpers (<code>wrapWorker</code> / <code>exposeBackgroundWorker</code>, which now ship with the SDK) for main→worker control.</p>
+      <div class="code"><pre><code class="language-ts">import { BroadcastChannelMailbox } from 'anyclaude-sdk'
+
+// inside each Web Worker / tab / worker_thread, same channel name:
+const mailbox = new BroadcastChannelMailbox({ channelName: 'team', origin: 'planner' })
+query({ prompt, workspace, llm, team: true, mailbox })
+
+// durable cross-tab (IndexedDB/localStorage fallbacks, older browsers, Node) in one call —
+// backed by the bundled `broadcast-channel` package, lazy-imported:
+const mb = await BroadcastChannelMailbox.crossTab({ channelName: 'team', origin: 'planner' })</code></pre></div>
+      <div class="card" style="border-left:3px solid var(--accent)"><p>Uses the global <code>BroadcastChannel</code> by default; inject <code>{ channel }</code> (any <code>ChannelLike</code>) for a custom transport. Each instance keeps an eventually-consistent replica; message ids are origin-scoped so workers never collide.</p></div>
 
       <h3>Driving a team in code</h3>
       <p>For full control, <code>runTeamLoop</code> coordinates an idle-loop where workers claim ready tasks until the board drains:</p>
