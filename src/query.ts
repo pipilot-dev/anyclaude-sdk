@@ -242,10 +242,24 @@ export function query(options: QueryOptions): Query {
     return gen
   }
 
-  // Wrap to emit one `run_end` with a coarse token-volume bucket when the run
-  // finishes (tokens aren't known until the `result` message). Pass-through only.
+  // Emit exactly one `run_end` with a coarse token-volume bucket when the run
+  // ends — by ANY path: normal completion, an early `break`/`.return()`, an
+  // `abort()`, or `interrupt()`. A bare `finally` only covers drain/close;
+  // streaming consumers (and the CLI) commonly abort or abandon the generator
+  // mid-stream, which is why `run_end` was firing on <3% of runs. Guarded so it
+  // fires once regardless of how many of these paths trigger.
+  let totalTokens = 0
+  let ended = false
+  const emitRunEnd = () => {
+    if (ended) return
+    ended = true
+    track('run_end', { model_family: modelFamily, tokens_bucket: tokenBucket(totalTokens) }, telemetry)
+  }
+  // Covers abort() and interrupt() (which calls abort()), including when the
+  // consumer never iterates the generator at all but does cancel.
+  abortController.signal.addEventListener('abort', emitRunEnd)
+
   const wrapped = (async function* () {
-    let totalTokens = 0
     try {
       for await (const m of gen) {
         if (m.type === 'result' && (m as { usage?: { input_tokens?: number; output_tokens?: number } }).usage) {
@@ -255,7 +269,8 @@ export function query(options: QueryOptions): Query {
         yield m
       }
     } finally {
-      track('run_end', { model_family: modelFamily, tokens_bucket: tokenBucket(totalTokens) }, telemetry)
+      // Covers normal completion, `break`, and explicit `.return()`.
+      emitRunEnd()
     }
   })() as Query
   wrapped.interrupt = () => abortController.abort()

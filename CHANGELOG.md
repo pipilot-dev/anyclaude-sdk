@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.11.2
+- **fix(telemetry): `run_end` now fires on every termination path.** It was in a bare `finally`, which only runs when the consumer fully drains or explicitly closes the generator — so streaming consumers that `abort()`/`interrupt()` or abandon the stream mid-run never emitted it (observed firing on <3% of runs, leaving token/outcome data dark). Now emitted exactly once via a guard, triggered by whichever comes first: normal completion, `break`/`.return()`, `abort()`, or `interrupt()`. Verified across all three paths. (Anonymous/aggregate as before — no code, prompts, repo, or keys; see TELEMETRY.md.)
+
 ### 0.11.1
 - **`dispatch_tasks({ background: true })`** — runs the team loop detached (via the background task manager) and returns immediately with a `bg_<n>` id, so the coordinator keeps control to **monitor and steer workers while they run**: poll `board_list` / `task_get` for live status, `send_message` to `worker:<taskId>` to redirect a running worker mid-task (delivered on its next step), and `task_output <id>` for the final summary. Requires `query({ background: true })`. The default (foreground) dispatch is unchanged. Closes the interactive supervision loop on top of 0.11.0's push delivery. (Verified end-to-end: background dispatch → live `board_list` monitoring → redirect a running worker → worker picks it up and completes.)
 
