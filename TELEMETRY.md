@@ -38,6 +38,7 @@ The default collector is an aggregate-only [Puter Worker](https://anyclaude-tele
 | `outcome` | `completed` / `error` / `max_turns` / `paused` / `aborted` | coarse run result — **no error messages or detail** (on `run_end`) |
 | `turns_bucket` | `1` / `2-5` / `6-20` / `21+` | coarse task complexity — **never an exact count** (on `run_end`) |
 | `duration_bucket` | `<1s` / `1-10s` / `10-60s` / `1-5m` / `5m+` | coarse run latency — **never an exact timing** (on `run_end`) |
+| `project` | `"pipilot"` | **OPT-IN, off by default.** Only sent if *you* set `query({ telemetry: { project: '…' } })` — a label you choose to attribute your own usage. Sanitized to ≤40 safe chars. This is the only identifying field, and it exists solely because *you* opted in. |
 
 That's the entire schema the SDK sends. Every value is a fixed enum or coarse bucket — there is **no free-form string and no field that identifies a user, project, repo, or machine**. The transport is fire-and-forget (`keepalive`), never blocks the agent, and swallows its own errors.
 

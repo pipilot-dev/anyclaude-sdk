@@ -249,6 +249,7 @@ export function query(options: QueryOptions): Query {
         sessions: !!options.sessionStore,
         partial_messages: !!options.includePartialMessages,
         resumed: !!options.continueRun || !!options.resume,
+        ...(telemetry.project ? { project: telemetry.project } : {}),
       },
       telemetry
     )

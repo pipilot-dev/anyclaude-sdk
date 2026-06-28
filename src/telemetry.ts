@@ -25,6 +25,11 @@ export interface TelemetryOptions {
   disabled?: boolean
   /** Collector URL. Defaults to `ANYCLAUDE_TELEMETRY_URL` then the built-in default. */
   url?: string
+  /** OPT-IN project/app label. Empty by default — nothing identifying is sent
+   *  unless YOU set this. When set (e.g. 'pipilot'), it's sent as a coarse
+   *  `project:<label>` counter so you can attribute your own usage. Sanitized to
+   *  ≤40 safe chars. This is the *only* identifying field, and it's consensual. */
+  project?: string
 }
 
 // Aggregate-only collector (Puter Worker; see examples/telemetry-collector).
@@ -42,6 +47,7 @@ const ALLOWED_STRING_KEYS = new Set([
   'outcome',
   'turns_bucket',
   'duration_bucket',
+  'project', // OPT-IN only — set via telemetry.project; never auto-populated
 ])
 
 /** Coarse token-volume bucket — never an exact count, so a single run isn't fingerprintable. */

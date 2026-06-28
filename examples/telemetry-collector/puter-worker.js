@@ -14,6 +14,8 @@ const STRING_FIELDS = {
   runtime: 12, sdk_version: 16, model_family: 24, tokens_bucket: 10,
   // run_end quality/perf buckets (coarse; no exact counts, no identifying data)
   outcome: 12, turns_bucket: 8, duration_bucket: 8,
+  // OPT-IN project label — only present if the integrator set telemetry.project
+  project: 40,
 }
 const BOOL_FIELDS = [
   'client_workspace_tools', 'client_tools', 'survivor', 'mcp', 'team',
