@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://anyclaude-docs.puter.site/sitemap.xml
