@@ -15,9 +15,10 @@
 //
 // See TELEMETRY.md for the full disclosure.
 import { uuid } from './util/ids.js'
+import { SDK_VERSION } from './version.js'
 
-/** Bump on release so adoption can be bucketed by version. */
-export const TELEMETRY_SDK_VERSION = '0.11.3'
+/** Bump on release so adoption can be bucketed by version. (Single source: version.ts.) */
+export const TELEMETRY_SDK_VERSION = SDK_VERSION
 
 export interface TelemetryOptions {
   /** Force-disable for this call (highest precedence besides the global opt-outs). */
@@ -34,7 +35,14 @@ const DEFAULT_TELEMETRY_URL = 'https://anyclaude-telemetry.puter.work'
 // Only these prop keys are ever transmitted, and only with safe value types.
 // Booleans pass through; these specific string keys pass through as-is (they are
 // coarse buckets we set ourselves — never free-form / user data).
-const ALLOWED_STRING_KEYS = new Set(['model_family', 'event_detail', 'tokens_bucket'])
+const ALLOWED_STRING_KEYS = new Set([
+  'model_family',
+  'event_detail',
+  'tokens_bucket',
+  'outcome',
+  'turns_bucket',
+  'duration_bucket',
+])
 
 /** Coarse token-volume bucket — never an exact count, so a single run isn't fingerprintable. */
 export function tokenBucket(total: number): string {
@@ -44,6 +52,42 @@ export function tokenBucket(total: number): string {
   if (total < 100_000) return '10k-100k'
   if (total < 1_000_000) return '100k-1m'
   return '1m+'
+}
+
+/** Coarse tool-loop iteration bucket — task complexity without an exact count. */
+export function turnsBucket(turns: number): string {
+  if (!Number.isFinite(turns) || turns <= 0) return '0'
+  if (turns === 1) return '1'
+  if (turns <= 5) return '2-5'
+  if (turns <= 20) return '6-20'
+  return '21+'
+}
+
+/** Coarse wall-clock bucket — run latency without an exact timing. */
+export function durationBucket(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return '0'
+  if (ms < 1_000) return '<1s'
+  if (ms < 10_000) return '1-10s'
+  if (ms < 60_000) return '10-60s'
+  if (ms < 300_000) return '1-5m'
+  return '5m+'
+}
+
+/** Coarse run outcome from a result `subtype` — success/failure mix, no detail. */
+export function outcomeOf(subtype?: string): string {
+  switch (subtype) {
+    case 'success':
+      return 'completed'
+    case 'error_max_turns':
+      return 'max_turns'
+    case 'error_during_execution':
+      return 'error'
+    case 'paused':
+    case 'client_tool_request':
+      return 'paused'
+    default:
+      return 'aborted'
+  }
 }
 
 function readEnv(name: string): string | undefined {

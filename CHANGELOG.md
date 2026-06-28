@@ -8,6 +8,10 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.12.0
+- **Update check (non-blocking, opt-out).** New `anyclaude-sdk/update` subpath: `checkForUpdate()` → `{ current, latest, outdated, error? }` (reads the npm registry, memoized per process, browser-throttled, never throws), and `notifyIfOutdated()` which prints **one** friendly console hint when you're behind latest. `query()` fires it automatically (once per process); suppress with `query({ updateCheck: false })`, `ANYCLAUDE_UPDATE_CHECK=0`, `DO_NOT_TRACK=1`, or `CI`. **It never installs anything and never blocks a run** — it's a hint, and the host app can drive its own "update available" UI off `checkForUpdate()`. New single-source `SDK_VERSION` export.
+- **Richer (still anonymous/aggregate) `run_end` telemetry.** Added three coarse buckets so adoption data answers reliability/perf questions, not just volume: `outcome` (`completed`/`error`/`max_turns`/`paused`/`aborted`), `turns_bucket` (`1`/`2-5`/`6-20`/`21+`), and `duration_bucket` (`<1s`/`1-10s`/`10-60s`/`1-5m`/`5m+`). New `turnsBucket`/`durationBucket`/`outcomeOf` helpers. Every value remains a fixed enum/bucket — no free-form strings, nothing identifying. See TELEMETRY.md.
+
 ### 0.11.3
 - docs(readme): surface the multi-agent team system in the headline + intro (it was missing from the npm landing) — coordinator/worker delegation, push delivery to running workers, background supervision, and cross-worker/tab teams via `BroadcastChannelMailbox`. No code change.
 

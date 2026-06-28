@@ -34,8 +34,12 @@ The default collector is an aggregate-only [Puter Worker](https://anyclaude-tele
 | `install` | random UUID | de-dupe runs; **not** tied to machine, user, or IP. Per-origin in the browser, per-process elsewhere |
 | `model_family` | `openai` / `anthropic` / `qwen` / `deepseek` / `generic` | a coarse bucket from the model id — **never the model id, endpoint, or key** |
 | feature booleans | `survivor: true`, `mcp: false`, … | which capabilities are used: `client_workspace_tools`, `client_tools`, `survivor`, `mcp`, `team`, `background`, `auto_compact`, `skills`, `sessions`, `partial_messages`, `resumed` |
+| `tokens_bucket` | `0` / `<1k` / `1k-10k` / `10k-100k` / `100k-1m` / `1m+` | coarse token volume — **never an exact count** (on `run_end`) |
+| `outcome` | `completed` / `error` / `max_turns` / `paused` / `aborted` | coarse run result — **no error messages or detail** (on `run_end`) |
+| `turns_bucket` | `1` / `2-5` / `6-20` / `21+` | coarse task complexity — **never an exact count** (on `run_end`) |
+| `duration_bucket` | `<1s` / `1-10s` / `10-60s` / `1-5m` / `5m+` | coarse run latency — **never an exact timing** (on `run_end`) |
 
-That's the entire schema the SDK sends. The transport is fire-and-forget (`keepalive`), never blocks the agent, and swallows its own errors.
+That's the entire schema the SDK sends. Every value is a fixed enum or coarse bucket — there is **no free-form string and no field that identifies a user, project, repo, or machine**. The transport is fire-and-forget (`keepalive`), never blocks the agent, and swallows its own errors.
 
 **Coarse country (collector-derived):** the collector additionally records a 2-letter **country code** derived from the request at the edge (e.g. `country:US`, `country:ZZ` for unknown), for a geographic breakdown of adoption. The **IP address is never read into a variable, stored, or returned** — only the country code is kept, as an aggregate counter. The SDK itself sends no location data; this is computed server-side from the connection.
 

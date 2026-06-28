@@ -10,7 +10,11 @@
 
 const PREFIX = 'tel:'
 const ALLOWED_EVENTS = new Set(['run', 'run_end'])
-const STRING_FIELDS = { runtime: 12, sdk_version: 16, model_family: 24, tokens_bucket: 10 }
+const STRING_FIELDS = {
+  runtime: 12, sdk_version: 16, model_family: 24, tokens_bucket: 10,
+  // run_end quality/perf buckets (coarse; no exact counts, no identifying data)
+  outcome: 12, turns_bucket: 8, duration_bucket: 8,
+}
 const BOOL_FIELDS = [
   'client_workspace_tools', 'client_tools', 'survivor', 'mcp', 'team',
   'background', 'auto_compact', 'skills', 'sessions', 'partial_messages', 'resumed',

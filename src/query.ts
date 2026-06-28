@@ -19,7 +19,16 @@ import type { SlashCommand } from './commands/index.js'
 import type { SessionStoreLike } from './session/index.js'
 import type { MemoryStore } from './memory/index.js'
 import { runAgent, type Workspace } from './agent.js'
-import { track, telemetryEnabled, tokenBucket, type TelemetryOptions } from './telemetry.js'
+import {
+  track,
+  telemetryEnabled,
+  tokenBucket,
+  turnsBucket,
+  durationBucket,
+  outcomeOf,
+  type TelemetryOptions,
+} from './telemetry.js'
+import { notifyIfOutdated } from './update.js'
 import { profileForModel } from './llm/profiles.js'
 
 export interface QueryOptions {
@@ -135,6 +144,10 @@ export interface QueryOptions {
   telemetry?: TelemetryOptions
   /** Convenience to force telemetry off for this run (same as `telemetry: { disabled: true }`). */
   disableTelemetry?: boolean
+  /** Non-blocking "a newer version is published" console hint (once per process).
+   *  Never installs or blocks. Default on; set false to suppress (or use the
+   *  `ANYCLAUDE_UPDATE_CHECK=0` env / `checkForUpdate()` for your own UI). */
+  updateCheck?: boolean
 }
 
 /** An async iterator of SDK messages, augmented with session controls. */
@@ -216,6 +229,10 @@ export function query(options: QueryOptions): Query {
   const modelFamily = profileForModel(options.model).name
   const enabled = telemetryEnabled(telemetry)
 
+  // Non-blocking, opt-out "you're behind latest" hint (once per process). Never
+  // installs, blocks, or throws. Suppressed when telemetry is force-disabled too.
+  if (options.updateCheck !== false && !telemetry.disabled) notifyIfOutdated()
+
   if (enabled) {
     track(
       'run',
@@ -249,11 +266,24 @@ export function query(options: QueryOptions): Query {
   // mid-stream, which is why `run_end` was firing on <3% of runs. Guarded so it
   // fires once regardless of how many of these paths trigger.
   let totalTokens = 0
+  let outcome = 'aborted' // default if run_end fires via abort before any result
+  let turns = 0
+  let durationMs = 0
   let ended = false
   const emitRunEnd = () => {
     if (ended) return
     ended = true
-    track('run_end', { model_family: modelFamily, tokens_bucket: tokenBucket(totalTokens) }, telemetry)
+    track(
+      'run_end',
+      {
+        model_family: modelFamily,
+        tokens_bucket: tokenBucket(totalTokens),
+        outcome,
+        turns_bucket: turnsBucket(turns),
+        duration_bucket: durationBucket(durationMs),
+      },
+      telemetry
+    )
   }
   // Covers abort() and interrupt() (which calls abort()), including when the
   // consumer never iterates the generator at all but does cancel.
@@ -262,9 +292,17 @@ export function query(options: QueryOptions): Query {
   const wrapped = (async function* () {
     try {
       for await (const m of gen) {
-        if (m.type === 'result' && (m as { usage?: { input_tokens?: number; output_tokens?: number } }).usage) {
-          const u = (m as { usage: { input_tokens?: number; output_tokens?: number } }).usage
-          totalTokens = (u.input_tokens || 0) + (u.output_tokens || 0)
+        if (m.type === 'result') {
+          const r = m as {
+            usage?: { input_tokens?: number; output_tokens?: number }
+            subtype?: string
+            num_turns?: number
+            duration_ms?: number
+          }
+          if (r.usage) totalTokens = (r.usage.input_tokens || 0) + (r.usage.output_tokens || 0)
+          if (typeof r.num_turns === 'number') turns = r.num_turns
+          if (typeof r.duration_ms === 'number') durationMs = r.duration_ms
+          outcome = outcomeOf(r.subtype)
         }
         yield m
       }

@@ -39,5 +39,14 @@ export * as paths from './util/paths.js'
 export { priceFor, computeCostUSD, contextWindowFor, type Pricing } from './util/pricing.js'
 export { estimateTokens, summarizeHistory, compactWithWindow } from './compact.js'
 export { track, telemetryEnabled, detectRuntime, TELEMETRY_SDK_VERSION, type TelemetryOptions } from './telemetry.js'
+export { SDK_VERSION } from './version.js'
+export {
+  checkForUpdate,
+  notifyIfOutdated,
+  updateCheckEnabled,
+  isOutdated,
+  type UpdateInfo,
+  type UpdateCheckOptions,
+} from './update.js'
 export { runToolLoop, type RunToolLoopOptions } from './loop.js'
 // (createResponsesClient is exported via ./llm/index.js)
