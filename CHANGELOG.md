@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.11.3
+- docs(readme): surface the multi-agent team system in the headline + intro (it was missing from the npm landing) — coordinator/worker delegation, push delivery to running workers, background supervision, and cross-worker/tab teams via `BroadcastChannelMailbox`. No code change.
+
 ### 0.11.2
 - **fix(telemetry): `run_end` now fires on every termination path.** It was in a bare `finally`, which only runs when the consumer fully drains or explicitly closes the generator — so streaming consumers that `abort()`/`interrupt()` or abandon the stream mid-run never emitted it (observed firing on <3% of runs, leaving token/outcome data dark). Now emitted exactly once via a guard, triggered by whichever comes first: normal completion, `break`/`.return()`, `abort()`, or `interrupt()`. Verified across all three paths. (Anonymous/aggregate as before — no code, prompts, repo, or keys; see TELEMETRY.md.)
 

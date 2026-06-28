@@ -7,9 +7,10 @@
 [![live demo](https://img.shields.io/badge/live%20demo-browser%20IDE-4dd0e1.svg)](https://anyclaude-docs.puter.site/demo/)
 
 Claude Code agent capabilities — tools, the tool loop, multi-turn conversations,
-MCP, sub-agents, sessions — against **any OpenAI- or Anthropic-compatible LLM
-endpoint**, running in the **browser** ([WebContainer](https://webcontainers.io)),
-**Node**, and **Bun**. No backend required, no OAuth, no native binaries.
+MCP, sub-agents, **multi-agent teams**, sessions — against **any OpenAI- or
+Anthropic-compatible LLM endpoint**, running in the **browser**
+([WebContainer](https://webcontainers.io)), **Node**, and **Bun**. No backend
+required, no OAuth, no native binaries.
 
 > **Live demo:** [a full IDE running in your browser](https://anyclaude-docs.puter.site/demo/) ·
 > **Docs:** [anyclaude-docs.puter.site](https://anyclaude-docs.puter.site) ·
@@ -18,6 +19,13 @@ endpoint**, running in the **browser** ([WebContainer](https://webcontainers.io)
 It exposes the same `query()` async-generator interface and the same `SDKMessage`
 envelope as `@anthropic-ai/claude-agent-sdk`, so code written against the official
 SDK can iterate our output unchanged.
+
+**Multi-agent teams** go beyond one agent: a coordinator delegates board tasks to
+worker sub-agents in parallel, you can **dispatch a message to a *running* worker**
+and have it land on its next tool round (push delivery, like the message queue),
+supervise them live with background dispatch, and even run agents in **separate
+Web Workers or browser tabs** that share one mailbox via `BroadcastChannelMailbox`.
+See [Teams & sub-agents](https://anyclaude-docs.puter.site/teams.html).
 
 ## Install
 
