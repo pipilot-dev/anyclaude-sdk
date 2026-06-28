@@ -48,6 +48,45 @@ function classify(repo) {
   return repo.language ? `${repo.language} project` : 'unclassified'
 }
 
+// Read the anonymous collector counters and derive CONCENTRATION — how much of
+// the volume is a few heavy senders vs broad adoption. Uses only aggregate
+// counts (no per-install data exists to read). `events/install` and per-day
+// `events/dau` near 1 ⇒ broad; large ⇒ a few whales inflating event totals.
+async function telemetrySummary() {
+  const url = process.env.ANYCLAUDE_TELEMETRY_URL || 'https://anyclaude-telemetry.puter.work'
+  try {
+    const res = await fetch(url, { headers: { accept: 'application/json' } })
+    if (!res.ok) return null
+    const c = await res.json()
+    const installs = c['installs:unique'] || 0
+    const events = c['event:total'] || 0
+    const days = Object.keys(c)
+      .filter((k) => k.startsWith('day:'))
+      .map((k) => k.slice(4))
+      .sort()
+    const perDay = days.map((d) => {
+      const ev = c[`day:${d}`] || 0
+      const dau = c[`dau:${d}`] || 0
+      return { day: d, events: ev, dau, ratio: dau ? +(ev / dau).toFixed(1) : null }
+    })
+    const countries = Object.entries(c)
+      .filter(([k]) => k.startsWith('country:'))
+      .map(([k, v]) => [k.slice(8), v])
+      .sort((a, b) => b[1] - a[1])
+    const topCountry = countries[0]
+    const countryTotal = countries.reduce((s, [, v]) => s + v, 0) || 1
+    return {
+      installs_unique: installs,
+      events_total: events,
+      events_per_install: installs ? +(events / installs).toFixed(1) : null,
+      top_country: topCountry ? { code: topCountry[0], share: +((topCountry[1] / countryTotal) * 100).toFixed(0) } : null,
+      per_day: perDay,
+    }
+  } catch {
+    return null
+  }
+}
+
 async function npmWeekly(pkg) {
   try {
     const res = await fetch(`https://api.npmjs.org/downloads/point/last-week/${pkg}`)
@@ -83,6 +122,7 @@ async function repoDetails(fullName, cache) {
 async function main() {
   const npm = {}
   for (const p of PACKAGES) npm[p] = await npmWeekly(p)
+  const telemetry = await telemetrySummary()
 
   const repos = new Map()
   const cache = new Map()
@@ -108,6 +148,7 @@ async function main() {
   const report = {
     generated_at: new Date().toISOString(),
     npm_weekly_downloads: npm,
+    telemetry_concentration: telemetry,
     public_dependent_repos: list.length,
     kinds: list.reduce((acc, r) => ((acc[r.kind] = (acc[r.kind] || 0) + 1), acc), {}),
     repos: list,
@@ -121,6 +162,23 @@ async function main() {
   console.log(`# anyclaude adoption report — ${report.generated_at.slice(0, 10)}\n`)
   console.log('## npm weekly downloads')
   for (const [p, n] of Object.entries(npm)) console.log(`- ${p}: ${n ?? 'n/a'}`)
+
+  if (telemetry) {
+    const t = telemetry
+    console.log('\n## Adoption signal (anonymous telemetry)')
+    console.log(`- **Unique installs: ${t.installs_unique}** ← the honest adoption number`)
+    console.log(`- Total events: ${t.events_total}  (events/install: ${t.events_per_install ?? 'n/a'})`)
+    if (t.top_country) console.log(`- Top country: ${t.top_country.code} = ${t.top_country.share}% of geo-tagged events`)
+    if (t.events_per_install && t.events_per_install > 25) {
+      console.log('  - ⚠ events/install is high — totals are inflated by a few heavy senders, not broad use.')
+    }
+    if (t.per_day.length) {
+      console.log('\n### Per day — events vs unique installs (ratio ≈1 broad, large = concentrated)')
+      console.log('| Day | Events | Unique installs | Events/install |')
+      console.log('|---|---|---|---|')
+      for (const d of t.per_day) console.log(`| ${d.day} | ${d.events} | ${d.dau} | ${d.ratio ?? '—'} |`)
+    }
+  }
   console.log(`\n## Public repos referencing the packages (package.json): ${list.length}`)
   if (!token) console.log('_(set GITHUB_TOKEN to populate this section)_')
   if (Object.keys(report.kinds).length) {

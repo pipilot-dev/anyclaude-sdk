@@ -76,6 +76,15 @@ router.post('/', async ({ request }) => {
       await me.puter.kv.set(seenKey, '1')
       await me.puter.kv.incr(PREFIX + 'installs:unique')
     }
+    // Daily-unique installs (DAU). Lets us read concentration WITHOUT storing
+    // per-install event counts: compare `day:<d>` (events) to `dau:<d>` (unique
+    // installs). A high events/dau ratio = a few heavy senders; ~1 = broad use.
+    // The per-day marker holds the id and is NEVER exposed (filtered in GET).
+    const seenDayKey = PREFIX + 'seenday:' + day + ':' + id
+    if (!(await me.puter.kv.get(seenDayKey))) {
+      await me.puter.kv.set(seenDayKey, '1')
+      await me.puter.kv.incr(PREFIX + 'dau:' + day)
+    }
   }
   return new Response(null, { status: 204, headers: CORS })
 })
@@ -117,7 +126,7 @@ router.get('/', async () => {
     for (const e of entries || []) {
       const key = (e.key ?? e.name ?? '').slice(PREFIX.length)
       // Never expose the per-install dedupe markers (they hold the anonymous id).
-      if (!key || key.startsWith('seen:')) continue
+      if (!key || key.startsWith('seen:') || key.startsWith('seenday:')) continue
       out[key] = Number(e.value) || 0
     }
   } catch {
