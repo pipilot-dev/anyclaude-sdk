@@ -29,6 +29,15 @@ export {
 // Tool-call repair — validate args before executing and feed the model a
 // corrective tool_result so it self-heals (the big reliability win for weak models).
 export { validateToolArguments, schemaHint, type ArgValidation } from './repair.js'
+export {
+  withRetry,
+  resolveRetry,
+  isRetryableStatus,
+  parseRetryAfter,
+  HttpError,
+  noRetry,
+  type RetryPolicy,
+} from './retry.js'
 // Type-only re-export (zero runtime cost) so custom `LLMClient` authors can get
 // fully-typed clients from this browser-clean subpath WITHOUT importing the bare
 // root (which pulls node:child_process + comlink into a browser bundle).

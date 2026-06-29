@@ -22,6 +22,7 @@ import type {
 } from '../types/index.js'
 import { consumeSSE } from './openai.js'
 import { parseInlineToolCalls } from './inlineTools.js'
+import { withRetry, resolveRetry, HttpError, noRetry, parseRetryAfter, type RetryPolicy } from './retry.js'
 
 export interface ResponsesClientOptions {
   apiKey?: string
@@ -34,6 +35,10 @@ export interface ResponsesClientOptions {
   maxTokens?: number
   /** Whether the server should persist state. Default false (we send full history). */
   store?: boolean
+  /** Retry policy for transient failures (network, 401/408/409/429, 5xx,
+   *  pre-stream drops). Up to 10 attempts, backoff capped at 30s; only retries
+   *  when nothing has streamed. `false` disables. */
+  retry?: RetryPolicy | boolean
 }
 
 /**
@@ -63,45 +68,53 @@ export function createResponsesClient(options: ResponsesClientOptions = {}): LLM
         body.tool_choice = 'auto'
       }
 
-      const res = await fetch(`${baseUrl}/responses`, {
-        method: 'POST',
-        signal: opts.signal,
-        headers: {
-          'content-type': 'application/json',
-          ...(options.apiKey ? { authorization: `Bearer ${options.apiKey}` } : {}),
-          ...options.headers,
-        },
-        body: JSON.stringify(body),
-      })
+      return await withRetry(async () => {
+        let streamed = false
+        const res = await fetch(`${baseUrl}/responses`, {
+          method: 'POST',
+          signal: opts.signal,
+          headers: {
+            'content-type': 'application/json',
+            ...(options.apiKey ? { authorization: `Bearer ${options.apiKey}` } : {}),
+            ...options.headers,
+          },
+          body: JSON.stringify(body),
+        })
 
-      if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => res.statusText)
-        throw new Error(`Responses request failed (${res.status}): ${errText}`)
-      }
-
-      let text = ''
-      let usage: Usage | undefined
-      let status: string | null = null
-      // Function calls stream as output items keyed by output_index.
-      const toolAcc = new Map<number, { callId: string; name: string; args: string }>()
-
-      await consumeSSE(res.body, (data) => {
-        if (data === '[DONE]') return
-        let ev: ResponsesEvent
-        try {
-          ev = JSON.parse(data)
-        } catch {
-          return
+        if (!res.ok || !res.body) {
+          const errText = await res.text().catch(() => res.statusText)
+          throw new HttpError(
+            res.status,
+            `Responses request failed (${res.status}): ${errText}`,
+            parseRetryAfter(res.headers, Date.now())
+          )
         }
 
-        switch (ev.type) {
-          case 'response.output_text.delta': {
-            if (typeof ev.delta === 'string' && ev.delta) {
-              text += ev.delta
-              opts.onToken(ev.delta)
+        let text = ''
+        let usage: Usage | undefined
+        let status: string | null = null
+        // Function calls stream as output items keyed by output_index.
+        const toolAcc = new Map<number, { callId: string; name: string; args: string }>()
+
+        try {
+          await consumeSSE(res.body, (data) => {
+            if (data === '[DONE]') return
+            let ev: ResponsesEvent
+            try {
+              ev = JSON.parse(data)
+            } catch {
+              return
             }
-            break
-          }
+
+            switch (ev.type) {
+              case 'response.output_text.delta': {
+                if (typeof ev.delta === 'string' && ev.delta) {
+                  text += ev.delta
+                  streamed = true
+                  opts.onToken(ev.delta)
+                }
+                break
+              }
           case 'response.output_item.added': {
             const item = ev.item
             if (item?.type === 'function_call') {
@@ -145,37 +158,41 @@ export function createResponsesClient(options: ResponsesClientOptions = {}): LLM
             status = r?.status ?? null
             break
           }
-          default:
-            break
+              default:
+                break
+            }
+          })
+        } catch (err) {
+          throw streamed ? noRetry(err) : err
         }
-      })
 
-      let toolCalls: ToolCall[] = [...toolAcc.entries()]
-        .sort(([a], [b]) => a - b)
-        .map(([idx, t]) => ({
-          id: t.callId || `call_${idx}`,
-          type: 'function' as const,
-          function: { name: t.name, arguments: t.args || '{}' },
-        }))
+        let toolCalls: ToolCall[] = [...toolAcc.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([idx, t]) => ({
+            id: t.callId || `call_${idx}`,
+            type: 'function' as const,
+            function: { name: t.name, arguments: t.args || '{}' },
+          }))
 
-      let finalText = text
-      if (!toolCalls.length) {
-        const inline = parseInlineToolCalls(text)
-        if (inline.calls.length) {
-          toolCalls = inline.calls
-          finalText = inline.cleanedText
+        let finalText = text
+        if (!toolCalls.length) {
+          const inline = parseInlineToolCalls(text)
+          if (inline.calls.length) {
+            toolCalls = inline.calls
+            finalText = inline.cleanedText
+          }
         }
-      }
 
-      if (toolCalls.length && opts.onTool) opts.onTool(toolCalls)
+        if (toolCalls.length && opts.onTool) opts.onTool(toolCalls)
 
-      const stopReason: StopReason = toolCalls.length
-        ? 'tool_use'
-        : status === 'incomplete'
-          ? 'max_tokens'
-          : 'end_turn'
+        const stopReason: StopReason = toolCalls.length
+          ? 'tool_use'
+          : status === 'incomplete'
+            ? 'max_tokens'
+            : 'end_turn'
 
-      return { text: finalText, toolCalls, model, usage, stopReason }
+        return { text: finalText, toolCalls, model, usage, stopReason }
+      }, { ...resolveRetry(options.retry), signal: opts.signal })
     },
   }
 }

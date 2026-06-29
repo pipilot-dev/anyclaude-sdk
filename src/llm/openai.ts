@@ -8,6 +8,7 @@ import type {
 } from '../types/index.js'
 import { parseToolCalls } from './dialects.js'
 import { profileForModel, type ModelProfile } from './profiles.js'
+import { withRetry, resolveRetry, HttpError, noRetry, parseRetryAfter, type RetryPolicy } from './retry.js'
 
 export interface OpenAIClientOptions {
   /** API key, or a function returning one per request (for round-robin key pools). */
@@ -40,6 +41,13 @@ export interface OpenAIClientOptions {
    * Overrides the profile's dialects. Set `[]` to disable inline recovery.
    */
   toolDialects?: string[]
+  /**
+   * Retry policy for transient failures (network errors, 401/408/409/429, 5xx,
+   * pre-stream socket drops). Up to 10 attempts with exponential backoff capped
+   * at 30s by default. A request is only retried if nothing has streamed yet.
+   * Pass `false` to disable, or a `RetryPolicy` to tune.
+   */
+  retry?: RetryPolicy | boolean
 }
 
 /**
@@ -86,81 +94,98 @@ export function createOpenAIClient(options: OpenAIClientOptions = {}): LLMClient
       }
       if (apiKey) headers.authorization = `Bearer ${apiKey}`
 
-      const res = await fetch(`${baseUrl}/chat/completions`, {
-        method: 'POST',
-        signal: opts.signal,
-        headers,
-        body: JSON.stringify(body),
-      })
+      // Each attempt re-issues the request from scratch. Accumulators live inside
+      // so a retry starts clean; `streamed` gates retries — once we've emitted a
+      // token or tool-delta we never retry (can't replay what the consumer saw).
+      return await withRetry(async () => {
+        let streamed = false
+        const res = await fetch(`${baseUrl}/chat/completions`, {
+          method: 'POST',
+          signal: opts.signal,
+          headers,
+          body: JSON.stringify(body),
+        })
 
-      if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => res.statusText)
-        throw new Error(`LLM request failed (${res.status}): ${errText}`)
-      }
+        if (!res.ok || !res.body) {
+          const errText = await res.text().catch(() => res.statusText)
+          throw new HttpError(
+            res.status,
+            `LLM request failed (${res.status}): ${errText}`,
+            parseRetryAfter(res.headers, Date.now())
+          )
+        }
 
-      let text = ''
-      let usage: import('../types/index.js').Usage | undefined
-      let finishReason: string | null = null
-      const toolAcc = new Map<number, { id: string; name: string; args: string }>()
+        let text = ''
+        let usage: import('../types/index.js').Usage | undefined
+        let finishReason: string | null = null
+        const toolAcc = new Map<number, { id: string; name: string; args: string }>()
 
-      await consumeSSE(res.body, (data) => {
-        if (data === '[DONE]') return
-        let chunk: OpenAIStreamChunk
         try {
-          chunk = JSON.parse(data)
-        } catch {
-          return
+          await consumeSSE(res.body, (data) => {
+            if (data === '[DONE]') return
+            let chunk: OpenAIStreamChunk
+            try {
+              chunk = JSON.parse(data)
+            } catch {
+              return
+            }
+            // The final usage chunk (stream_options.include_usage) has empty choices.
+            if (chunk.usage) {
+              usage = {
+                input_tokens: chunk.usage.prompt_tokens ?? 0,
+                output_tokens: chunk.usage.completion_tokens ?? 0,
+                cache_read_input_tokens: chunk.usage.prompt_tokens_details?.cached_tokens,
+              }
+            }
+            const choice = chunk.choices?.[0]
+            if (choice?.finish_reason) finishReason = choice.finish_reason
+            const delta = choice?.delta
+            if (!delta) return
+
+            if (typeof delta.content === 'string' && delta.content) {
+              text += delta.content
+              streamed = true
+              opts.onToken(delta.content)
+            }
+            if (delta.tool_calls) {
+              streamed = true
+              for (const tc of delta.tool_calls) {
+                const idx = tc.index ?? 0
+                const cur = toolAcc.get(idx) ?? { id: '', name: '', args: '' }
+                if (tc.id) cur.id = tc.id
+                if (tc.function?.name) cur.name = tc.function.name
+                if (tc.function?.arguments) cur.args += tc.function.arguments
+                toolAcc.set(idx, cur)
+              }
+            }
+          })
+        } catch (err) {
+          // Socket dropped mid-stream: only safe to retry if nothing was emitted.
+          throw streamed ? noRetry(err) : err
         }
-        // The final usage chunk (stream_options.include_usage) has empty choices.
-        if (chunk.usage) {
-          usage = {
-            input_tokens: chunk.usage.prompt_tokens ?? 0,
-            output_tokens: chunk.usage.completion_tokens ?? 0,
-            cache_read_input_tokens: chunk.usage.prompt_tokens_details?.cached_tokens,
-          }
+
+        const toolCalls: ToolCall[] = [...toolAcc.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([idx, t]) => ({
+            id: t.id || `call_${idx}`,
+            type: 'function' as const,
+            function: { name: t.name, arguments: t.args || '{}' },
+          }))
+
+        // Fallback: some endpoints emit tool calls as inline text rather than
+        // native tool_calls. Parse them with the profile's dialects and clean the
+        // visible text. (Empty `dialects` — e.g. for native GPT/Claude — skips this.)
+        let finalText = text
+        if (!toolCalls.length && (!dialects || dialects.length)) {
+          const inline = parseToolCalls(text, { dialects, toolNames: opts.tools?.map((t) => t.function.name) })
+          toolCalls.push(...inline.calls)
+          finalText = inline.cleanedText // also scrubs leaked control tags even when no call is found
         }
-        const choice = chunk.choices?.[0]
-        if (choice?.finish_reason) finishReason = choice.finish_reason
-        const delta = choice?.delta
-        if (!delta) return
 
-        if (typeof delta.content === 'string' && delta.content) {
-          text += delta.content
-          opts.onToken(delta.content)
-        }
-        if (delta.tool_calls) {
-          for (const tc of delta.tool_calls) {
-            const idx = tc.index ?? 0
-            const cur = toolAcc.get(idx) ?? { id: '', name: '', args: '' }
-            if (tc.id) cur.id = tc.id
-            if (tc.function?.name) cur.name = tc.function.name
-            if (tc.function?.arguments) cur.args += tc.function.arguments
-            toolAcc.set(idx, cur)
-          }
-        }
-      })
+        if (toolCalls.length && opts.onTool) opts.onTool(toolCalls)
 
-      const toolCalls: ToolCall[] = [...toolAcc.entries()]
-        .sort(([a], [b]) => a - b)
-        .map(([idx, t]) => ({
-          id: t.id || `call_${idx}`,
-          type: 'function' as const,
-          function: { name: t.name, arguments: t.args || '{}' },
-        }))
-
-      // Fallback: some endpoints emit tool calls as inline text rather than
-      // native tool_calls. Parse them with the profile's dialects and clean the
-      // visible text. (Empty `dialects` — e.g. for native GPT/Claude — skips this.)
-      let finalText = text
-      if (!toolCalls.length && (!dialects || dialects.length)) {
-        const inline = parseToolCalls(text, { dialects, toolNames: opts.tools?.map((t) => t.function.name) })
-        toolCalls.push(...inline.calls)
-        finalText = inline.cleanedText // also scrubs leaked control tags even when no call is found
-      }
-
-      if (toolCalls.length && opts.onTool) opts.onTool(toolCalls)
-
-      return { text: finalText, toolCalls, model, usage, stopReason: mapFinishReason(finishReason) }
+        return { text: finalText, toolCalls, model, usage, stopReason: mapFinishReason(finishReason) }
+      }, { ...resolveRetry(options.retry), signal: opts.signal })
     },
   }
 }

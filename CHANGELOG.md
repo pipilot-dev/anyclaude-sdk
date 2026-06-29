@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.13.0
+- **Automatic retries on transient LLM failures (shared policy, all built-in clients).** The engine previously threw on the *first* non-OK response — a single transient `401`/`429`/`5xx`, a dropped socket, or a network blip killed the whole run. Now `createOpenAIClient` / `createAnthropicClient` / `createResponsesClient` retry up to **10×** with exponential backoff capped at 30s (`1→2→4→8→16→30…s`), honoring a `Retry-After` header when present. Retryable: network errors, `401`/`408`/`409`/`429`/`5xx`, and pre-stream socket drops. **Hard safety rule:** a request is only retried if *nothing has streamed to the consumer yet* — once tokens (or tool-call deltas) are emitted, the error surfaces instead of double-emitting. Tune or disable per client via `retry: { maxAttempts, baseMs, maxMs, retryStatus, … }` or `retry: false`. New `anyclaude-sdk/llm` exports: `withRetry`, `RetryPolicy`, `isRetryableStatus`, `HttpError`, `parseRetryAfter`, `noRetry`, `resolveRetry`. (Note: `401` is retried by default because some gateways emit transient 401s on cold-start/key-refresh; override `retryStatus` to exclude it for a hard-auth endpoint.)
+
 ### 0.12.1
 - **Opt-in `project` telemetry label (consensual attribution).** `query({ telemetry: { project: 'my-app' } })` sends a `project:<label>` counter so *you* can attribute your own usage in the aggregate data. **Off by default** — nothing identifying is ever sent unless you set it. Sanitized to ≤40 safe chars (and re-sanitized server-side). This is the only identifying field in the schema and it exists solely because the integrator opts in. See TELEMETRY.md.
 

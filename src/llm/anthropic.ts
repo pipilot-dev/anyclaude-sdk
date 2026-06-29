@@ -16,6 +16,7 @@ import type {
 } from '../types/index.js'
 import { consumeSSE } from './openai.js'
 import { parseInlineToolCalls } from './inlineTools.js'
+import { withRetry, resolveRetry, HttpError, noRetry, parseRetryAfter, type RetryPolicy } from './retry.js'
 
 export interface AnthropicClientOptions {
   apiKey?: string
@@ -31,6 +32,10 @@ export interface AnthropicClientOptions {
   temperature?: number
   /** Max output tokens (required by the API). Default: 4096. */
   maxTokens?: number
+  /** Retry policy for transient failures (network, 401/408/409/429, 5xx,
+   *  pre-stream drops). Up to 10 attempts, exponential backoff capped at 30s by
+   *  default; only retries when nothing has streamed. `false` disables. */
+  retry?: RetryPolicy | boolean
 }
 
 /**
@@ -60,113 +65,127 @@ export function createAnthropicClient(options: AnthropicClientOptions = {}): LLM
       if (options.temperature !== undefined) body.temperature = options.temperature
       if (opts.tools?.length) body.tools = opts.tools.map(toAnthropicTool)
 
-      const res = await fetch(`${baseUrl}/messages`, {
-        method: 'POST',
-        signal: opts.signal,
-        headers: {
-          'content-type': 'application/json',
-          'anthropic-version': version,
-          'anthropic-dangerous-direct-browser-access': 'true',
-          ...(options.apiKey ? { 'x-api-key': options.apiKey } : {}),
-          ...options.headers,
-        },
-        body: JSON.stringify(body),
-      })
+      return await withRetry(async () => {
+        let streamed = false
+        const res = await fetch(`${baseUrl}/messages`, {
+          method: 'POST',
+          signal: opts.signal,
+          headers: {
+            'content-type': 'application/json',
+            'anthropic-version': version,
+            'anthropic-dangerous-direct-browser-access': 'true',
+            ...(options.apiKey ? { 'x-api-key': options.apiKey } : {}),
+            ...options.headers,
+          },
+          body: JSON.stringify(body),
+        })
 
-      if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => res.statusText)
-        throw new Error(`Anthropic request failed (${res.status}): ${errText}`)
-      }
+        if (!res.ok || !res.body) {
+          const errText = await res.text().catch(() => res.statusText)
+          throw new HttpError(
+            res.status,
+            `Anthropic request failed (${res.status}): ${errText}`,
+            parseRetryAfter(res.headers, Date.now())
+          )
+        }
 
-      let text = ''
-      let inputTokens = 0
-      let outputTokens = 0
-      let cacheRead: number | undefined
-      let cacheCreation: number | undefined
-      let stopReason: import('../types/index.js').StopReason = null
-      // Tool uses arrive as a content_block_start (with id/name) followed by a
-      // sequence of input_json_delta partials. Accumulate by block index.
-      const toolAcc = new Map<number, { id: string; name: string; json: string }>()
+        let text = ''
+        let inputTokens = 0
+        let outputTokens = 0
+        let cacheRead: number | undefined
+        let cacheCreation: number | undefined
+        let stopReason: import('../types/index.js').StopReason = null
+        // Tool uses arrive as a content_block_start (with id/name) followed by a
+        // sequence of input_json_delta partials. Accumulate by block index.
+        const toolAcc = new Map<number, { id: string; name: string; json: string }>()
 
-      await consumeSSE(res.body, (data) => {
-        if (data === '[DONE]') return
-        let event: AnthropicStreamEvent
         try {
-          event = JSON.parse(data)
-        } catch {
-          return
-        }
-
-        // Usage: input tokens arrive on message_start, output on message_delta.
-        if (event.type === 'message_start' && event.message?.usage) {
-          inputTokens = event.message.usage.input_tokens ?? 0
-          cacheRead = event.message.usage.cache_read_input_tokens ?? cacheRead
-          cacheCreation = event.message.usage.cache_creation_input_tokens ?? cacheCreation
-        }
-        if (event.type === 'message_delta') {
-          if (event.usage?.output_tokens != null) outputTokens = event.usage.output_tokens
-          if (event.delta?.stop_reason) stopReason = mapStop(event.delta.stop_reason)
-        }
-
-        switch (event.type) {
-          case 'content_block_start': {
-            const block = event.content_block
-            if (block?.type === 'tool_use') {
-              toolAcc.set(event.index ?? 0, {
-                id: block.id ?? '',
-                name: block.name ?? '',
-                json: '',
-              })
+          await consumeSSE(res.body, (data) => {
+            if (data === '[DONE]') return
+            let event: AnthropicStreamEvent
+            try {
+              event = JSON.parse(data)
+            } catch {
+              return
             }
-            break
-          }
-          case 'content_block_delta': {
-            const delta = event.delta
-            if (delta?.type === 'text_delta' && delta.text) {
-              text += delta.text
-              opts.onToken(delta.text)
-            } else if (delta?.type === 'input_json_delta' && delta.partial_json) {
-              const cur = toolAcc.get(event.index ?? 0)
-              if (cur) cur.json += delta.partial_json
+
+            // Usage: input tokens arrive on message_start, output on message_delta.
+            if (event.type === 'message_start' && event.message?.usage) {
+              inputTokens = event.message.usage.input_tokens ?? 0
+              cacheRead = event.message.usage.cache_read_input_tokens ?? cacheRead
+              cacheCreation = event.message.usage.cache_creation_input_tokens ?? cacheCreation
             }
-            break
+            if (event.type === 'message_delta') {
+              if (event.usage?.output_tokens != null) outputTokens = event.usage.output_tokens
+              if (event.delta?.stop_reason) stopReason = mapStop(event.delta.stop_reason)
+            }
+
+            switch (event.type) {
+              case 'content_block_start': {
+                const block = event.content_block
+                if (block?.type === 'tool_use') {
+                  streamed = true
+                  toolAcc.set(event.index ?? 0, {
+                    id: block.id ?? '',
+                    name: block.name ?? '',
+                    json: '',
+                  })
+                }
+                break
+              }
+              case 'content_block_delta': {
+                const delta = event.delta
+                if (delta?.type === 'text_delta' && delta.text) {
+                  text += delta.text
+                  streamed = true
+                  opts.onToken(delta.text)
+                } else if (delta?.type === 'input_json_delta' && delta.partial_json) {
+                  streamed = true
+                  const cur = toolAcc.get(event.index ?? 0)
+                  if (cur) cur.json += delta.partial_json
+                }
+                break
+              }
+              default:
+                // message_start / message_delta / message_stop / content_block_stop
+                // / ping — nothing to accumulate.
+                break
+            }
+          })
+        } catch (err) {
+          throw streamed ? noRetry(err) : err
+        }
+
+        const toolCalls: ToolCall[] = [...toolAcc.entries()]
+          .sort(([a], [b]) => a - b)
+          .map(([idx, t]) => ({
+            id: t.id || `toolu_${idx}`,
+            type: 'function' as const,
+            // `json` is already a JSON-encoded object string; default to "{}".
+            function: { name: t.name, arguments: t.json || '{}' },
+          }))
+
+        // Fallback: some relays/models emit tool calls as inline text rather than
+        // native tool_use blocks. Parse them out and clean the visible text.
+        let finalText = text
+        if (!toolCalls.length) {
+          const inline = parseInlineToolCalls(text)
+          if (inline.calls.length) {
+            toolCalls.push(...inline.calls)
+            finalText = inline.cleanedText
           }
-          default:
-            // message_start / message_delta / message_stop / content_block_stop
-            // / ping — nothing to accumulate.
-            break
         }
-      })
 
-      const toolCalls: ToolCall[] = [...toolAcc.entries()]
-        .sort(([a], [b]) => a - b)
-        .map(([idx, t]) => ({
-          id: t.id || `toolu_${idx}`,
-          type: 'function' as const,
-          // `json` is already a JSON-encoded object string; default to "{}".
-          function: { name: t.name, arguments: t.json || '{}' },
-        }))
+        if (toolCalls.length && opts.onTool) opts.onTool(toolCalls)
 
-      // Fallback: some relays/models emit tool calls as inline text rather than
-      // native tool_use blocks. Parse them out and clean the visible text.
-      let finalText = text
-      if (!toolCalls.length) {
-        const inline = parseInlineToolCalls(text)
-        if (inline.calls.length) {
-          toolCalls.push(...inline.calls)
-          finalText = inline.cleanedText
+        const usage: import('../types/index.js').Usage = {
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          cache_read_input_tokens: cacheRead,
+          cache_creation_input_tokens: cacheCreation,
         }
-      }
-
-      if (toolCalls.length && opts.onTool) opts.onTool(toolCalls)
-
-      const usage: import('../types/index.js').Usage = {
-        input_tokens: inputTokens,
-        output_tokens: outputTokens,
-        cache_read_input_tokens: cacheRead,
-        cache_creation_input_tokens: cacheCreation,
-      }
-      return { text: finalText, toolCalls, model, usage, stopReason }
+        return { text: finalText, toolCalls, model, usage, stopReason }
+      }, { ...resolveRetry(options.retry), signal: opts.signal })
     },
   }
 }
