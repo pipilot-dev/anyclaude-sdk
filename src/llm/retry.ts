@@ -5,6 +5,19 @@
 // to the consumer yet — once tokens (or tool-call deltas) have been emitted we
 // can't replay them, so we surface the error instead of double-emitting.
 
+/** Info passed to an `onRetry` observer before each backoff wait. */
+export interface RetryInfo {
+  /** 1-based retry number (the upcoming attempt is `attempt + 1` of `maxAttempts`). */
+  attempt: number
+  maxAttempts: number
+  /** Milliseconds we'll wait before the next attempt. */
+  delayMs: number
+  /** HTTP status if the failure was an HTTP error. */
+  status?: number
+  /** Coarse reason: 'network' | 'http <status>' | etc. */
+  reason: string
+}
+
 /** What to retry and how. All fields optional; sensible defaults applied. */
 export interface RetryPolicy {
   /** Max total attempts (incl. the first). Default 10. Set 1 to disable retries. */
@@ -13,14 +26,25 @@ export interface RetryPolicy {
   baseMs?: number
   /** Backoff ceiling in ms. Default 30000 (→ 1→2→4→8→16→30→30…s). */
   maxMs?: number
-  /** Add ±jitter (fraction 0–1 of the delay) to avoid thundering herds. Default 0.1. */
+  /** ±jitter as a fraction (0–1) of each delay, applied randomly to break up
+   *  synchronized retries across many clients. Default 0.2 (±20%). */
   jitter?: number
+  /** Max retries specifically for `401` responses. Default 1 — transient
+   *  cold-start/key-refresh 401s clear on one retry, but a genuinely bad key
+   *  shouldn't burn the full `maxAttempts`. Other retryable statuses use
+   *  `maxAttempts`. Set 0 to never retry 401. */
+  authRetries?: number
   /** Override which HTTP statuses are retryable. Default {@link isRetryableStatus}. */
   retryStatus?: (status: number) => boolean
   /** Abort: stops waiting and aborts the loop. Usually the run's signal. */
   signal?: AbortSignal
-  /** Observe each retry (for logging / telemetry). Never throws. */
-  onRetry?: (info: { attempt: number; delayMs: number; status?: number; reason: string }) => void
+  /** Observe each retry (route to your logger / telemetry). Replaces the default
+   *  console.warn notice. Never throws. */
+  onRetry?: (info: RetryInfo) => void
+  /** Suppress the default console.warn notice without supplying `onRetry`. */
+  silent?: boolean
+  /** Random source for jitter (0–1). Default `Math.random`. Inject for tests. */
+  random?: () => number
 }
 
 /**
@@ -119,10 +143,24 @@ export async function withRetry<T>(
   const max = Math.max(1, policy.maxAttempts ?? 10)
   const base = policy.baseMs ?? 1000
   const cap = policy.maxMs ?? 30_000
-  const jitter = policy.jitter ?? 0.1
+  const jitter = policy.jitter ?? 0.2
+  const authRetries = policy.authRetries ?? 1
   const retryStatus = policy.retryStatus ?? isRetryableStatus
+  const rand = policy.random ?? Math.random
+  // Visibility: route to onRetry if given, else warn once-per-retry (unless silent).
+  const notify =
+    policy.onRetry ??
+    (policy.silent
+      ? undefined
+      : (info: RetryInfo) => {
+          // eslint-disable-next-line no-console
+          ;(globalThis.console?.warn ?? (() => {}))(
+            `[anyclaude-sdk] LLM ${info.reason} — retry ${info.attempt}/${info.maxAttempts - 1} in ${info.delayMs}ms`
+          )
+        })
 
   let lastErr: unknown
+  let auth401Used = 0
   for (let i = 0; i < max; i++) {
     if (policy.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
     try {
@@ -130,15 +168,22 @@ export async function withRetry<T>(
     } catch (err) {
       lastErr = err
       const c = classify(err, retryStatus)
-      if (!c.retryable || i >= max - 1) throw err
+      let retryable = c.retryable
+      // Fail fast on a (likely permanent) bad-key 401 — retry it at most
+      // `authRetries` times, not the full budget.
+      if (retryable && c.status === 401) {
+        if (auth401Used >= authRetries) retryable = false
+        else auth401Used++
+      }
+      if (!retryable || i >= max - 1) throw err
       // Honor Retry-After when the server gave one; else exponential, capped.
       const expo = Math.min(base * 2 ** i, cap)
       const wait = c.retryAfterMs != null ? Math.min(Math.max(c.retryAfterMs, 0), cap) : expo
-      // Full-ish jitter: wait ± jitter*wait, varied per attempt (no Math.random
-      // needed for determinism — derive from attempt index).
-      const j = jitter > 0 ? wait * jitter * (((i % 3) - 1) / 1) : 0
-      const delay = Math.max(0, Math.round(wait + j))
-      policy.onRetry?.({ attempt: i + 1, delayMs: delay, status: c.status, reason: c.reason })
+      // Randomized ± jitter so many clients hitting the same limit don't retry
+      // in lockstep. rand()∈[0,1) → factor ∈ [1-jitter, 1+jitter).
+      const factor = jitter > 0 ? 1 + jitter * (rand() * 2 - 1) : 1
+      const delay = Math.max(0, Math.round(Math.min(wait * factor, cap)))
+      notify?.({ attempt: i + 1, maxAttempts: max, delayMs: delay, status: c.status, reason: c.reason })
       await sleep(delay, policy.signal)
     }
   }

@@ -8,6 +8,12 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.13.1
+Retry-policy refinements (follow-ups to 0.13.0):
+- **Smarter 401 handling.** A `401` is now retried at most once by default (`authRetries: 1`) instead of consuming the full 10-attempt budget — transient cold-start/key-refresh 401s still clear, but a genuinely bad key fails fast (~1s) instead of stalling ~90s. Set `authRetries: 0` to never retry 401, or raise it.
+- **Real randomized jitter.** Backoff jitter is now actually random (`±20%` by default via `Math.random`, injectable via `random` for tests) instead of a deterministic cycle — so many clients hitting the same `429` no longer retry in lockstep.
+- **Retry visibility.** Retries are no longer silent: by default each one logs a one-line `console.warn` (`LLM http 429 — retry 2/10 in 2000ms`). Provide `retry: { onRetry }` to route retries into your own logger/telemetry, or `retry: { silent: true }` to quiet them. New `RetryInfo` type.
+
 ### 0.13.0
 - **Automatic retries on transient LLM failures (shared policy, all built-in clients).** The engine previously threw on the *first* non-OK response — a single transient `401`/`429`/`5xx`, a dropped socket, or a network blip killed the whole run. Now `createOpenAIClient` / `createAnthropicClient` / `createResponsesClient` retry up to **10×** with exponential backoff capped at 30s (`1→2→4→8→16→30…s`), honoring a `Retry-After` header when present. Retryable: network errors, `401`/`408`/`409`/`429`/`5xx`, and pre-stream socket drops. **Hard safety rule:** a request is only retried if *nothing has streamed to the consumer yet* — once tokens (or tool-call deltas) are emitted, the error surfaces instead of double-emitting. Tune or disable per client via `retry: { maxAttempts, baseMs, maxMs, retryStatus, … }` or `retry: false`. New `anyclaude-sdk/llm` exports: `withRetry`, `RetryPolicy`, `isRetryableStatus`, `HttpError`, `parseRetryAfter`, `noRetry`, `resolveRetry`. (Note: `401` is retried by default because some gateways emit transient 401s on cold-start/key-refresh; override `retryStatus` to exclude it for a hard-auth endpoint.)
 

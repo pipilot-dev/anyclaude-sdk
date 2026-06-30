@@ -34,7 +34,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.13.0 · MIT</div>
+    <div class="brand-sub">v0.13.1 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
@@ -166,7 +166,7 @@ node scripts/compat-matrix.mjs ./compat.config.json   # your endpoints; keys via
   parallelToolCalls?: boolean, // → parallel_tool_calls (only sent when tools are present)
   retry?: RetryPolicy | false, // transient-failure retries (default on) — see below
 })</code></pre></div>
-      <div class="card" style="border-left:3px solid var(--accent)"><p><i data-lucide="repeat"></i> <b>Automatic retries.</b> All three clients retry transient failures — network errors, <code>401</code>/<code>408</code>/<code>409</code>/<code>429</code>/<code>5xx</code>, and pre-stream socket drops — up to <b>10×</b> with exponential backoff capped at 30s (<code>1→2→4→8→16→30s</code>), honoring <code>Retry-After</code>. A request is only retried if <b>nothing has streamed yet</b>, so tokens are never double-emitted. Tune with <code>retry: { maxAttempts, baseMs, maxMs, retryStatus }</code> or disable with <code>retry: false</code>. (<code>401</code> is retried by default for gateways that emit transient 401s on cold-start/key-refresh; override <code>retryStatus</code> to exclude it.)</p></div>
+      <div class="card" style="border-left:3px solid var(--accent)"><p><i data-lucide="repeat"></i> <b>Automatic retries.</b> All three clients retry transient failures — network errors, <code>401</code>/<code>408</code>/<code>409</code>/<code>429</code>/<code>5xx</code>, and pre-stream socket drops — up to <b>10×</b> with exponential backoff capped at 30s (<code>1→2→4→8→16→30s</code>), honoring <code>Retry-After</code>. A request is only retried if <b>nothing has streamed yet</b>, so tokens are never double-emitted. Backoff carries randomized ±20% jitter so many clients don't retry in lockstep, and each retry logs a one-line <code>console.warn</code> (route it via <code>onRetry</code>, or quiet it with <code>silent: true</code>). A <code>401</code> is retried at most once by default (<code>authRetries: 1</code>) — transient cold-start/key-refresh 401s clear, but a bad key fails fast. Tune with <code>retry: { maxAttempts, baseMs, maxMs, authRetries, retryStatus, onRetry }</code> or disable with <code>retry: false</code>.</p></div>
       <p><code>createAnthropicClient</code> takes <code>apiKey</code>, <code>baseUrl</code>, <code>model</code>, <code>headers</code>, <code>temperature</code>, <code>maxTokens</code> (default 4096), and <code>anthropicVersion</code> (default <code>'2023-06-01'</code>). <code>createResponsesClient</code> takes <code>apiKey</code>, <code>baseUrl</code>, <code>model</code>, <code>headers</code>, <code>temperature</code>, <code>maxTokens</code> (→ <code>max_output_tokens</code>), and <code>store</code> (default false — full history is sent each turn).</p>
       <div class="card" style="border-left:3px solid var(--accent)"><p><i data-lucide="info"></i> All clients stream Server-Sent Events and request <code>stream_options.include_usage</code>, so token usage and cost are reported even mid-stream. Keyless endpoints just omit <code>apiKey</code> — no <code>authorization</code> header is sent.</p></div>
     </section>
