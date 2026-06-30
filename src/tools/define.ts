@@ -29,6 +29,9 @@ export interface DefineToolSpec {
   defer?: boolean
   /** Safe to run concurrently with other calls in a turn (see Tool.parallelSafe). */
   parallelSafe?: boolean
+  /** End the run after this tool executes — no follow-up LLM call (see Tool.endsTurn).
+   *  Use for an explicit `finish`/`done` tool. */
+  endsTurn?: boolean
 }
 
 /** Build a `Tool` from a friendly spec. */
@@ -52,5 +55,6 @@ export function defineTool(spec: DefineToolSpec): Tool {
   if (spec.maxResultChars !== undefined) tool.maxResultChars = spec.maxResultChars
   if (spec.defer) tool.defer = true
   if (spec.parallelSafe) tool.parallelSafe = true
+  if (spec.endsTurn) tool.endsTurn = true
   return tool
 }

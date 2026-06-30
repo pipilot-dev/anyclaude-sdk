@@ -8,6 +8,11 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.14.1
+Two fixes for the end-of-run experience (seen in the wild — a run ending in a blank "(empty response)" after a `finish` tool):
+- **No more blank trailing turn.** When a model returns a wholly-empty turn (no text, no tool calls — e.g. only a reasoning/thinking block, which happens right after a terminal tool when it has nothing left to say), the SDK no longer emits an assistant message with an empty `content` array. That empty array was rendering as a blank "(empty response)" bubble. The run's `result` still carries the last meaningful text.
+- **Terminal tools — `defineTool({ endsTurn: true })`.** A tool marked `endsTurn` ends the run as soon as it executes, with **no follow-up LLM call**. Use it for an explicit `finish`/`done` tool the model calls to signal completion — previously the loop made one more round-trip that just returned an empty turn (wasted tokens + latency). New `Tool.endsTurn` / `DefineToolSpec.endsTurn`.
+
 ### 0.14.0
 - **Local stdio MCP servers** — `query({ mcpServers: { fs: { type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/work'] } } })`. The SDK spawns the command as a child process and speaks newline-delimited JSON-RPC over stdin/stdout (the transport Claude Code and most MCP servers use), discovering tools and exposing them as `mcp__<server>__<tool>` just like HTTP/SSE/in-process servers. Config: `command`, `args?`, `env?` (merged over parent env), `cwd?`, `timeoutMs?` (default 60s). **Node/Bun only** — `node:child_process` is lazy-imported so the browser build stays clean, and in the browser a stdio server reports a `failed` status (clear message) without affecting the run. The child is `unref()`-ed (never blocks process exit) and killed on the run's `abortController` abort or `StdioMcpClient.close()`. New exports: `StdioMcpClient`, `McpStdioServerConfig`. Pairs naturally with `LocalSandbox` for a Claude-Code-like local agent.
 

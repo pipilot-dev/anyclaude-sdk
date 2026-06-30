@@ -114,4 +114,12 @@ export interface Tool {
    * (e.g. get_console_logs, screenshot, fetch-status).
    */
   parallelSafe?: boolean
+  /**
+   * Terminal tool: when called, END the run after executing it — no follow-up LLM
+   * round-trip. Use for an explicit `finish`/`done` tool the model calls to signal
+   * completion; without this the loop calls the model once more, which typically
+   * returns an empty turn (wasted tokens + latency). The tool's result is still
+   * recorded; the run's final text is the last assistant text before it.
+   */
+  endsTurn?: boolean
 }

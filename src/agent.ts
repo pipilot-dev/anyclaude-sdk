@@ -987,30 +987,37 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
       if (text) assistantContent.push({ type: 'text', text })
       assistantContent.push(...toolUseBlocks(calls))
 
-      const apiAssistant: APIAssistantMessage = {
-        id: 'msg_' + uuid().replace(/-/g, '').slice(0, 24),
-        type: 'message',
-        role: 'assistant',
-        model: resultModel,
-        content: assistantContent,
-        stop_reason: stopReason,
-        stop_sequence: null,
-        usage: result.usage ?? emptyUsage(),
-      }
+      // A wholly-empty turn (no text, no tool calls) happens when a model emits
+      // only a reasoning/thinking block — typically right after a terminal tool
+      // like `finish`, when it has nothing left to say. Don't surface it: an
+      // empty content array renders as a blank "(empty response)" bubble. The
+      // run's `result` still carries the last meaningful text (`lastText`).
+      if (assistantContent.length) {
+        const apiAssistant: APIAssistantMessage = {
+          id: 'msg_' + uuid().replace(/-/g, '').slice(0, 24),
+          type: 'message',
+          role: 'assistant',
+          model: resultModel,
+          content: assistantContent,
+          stop_reason: stopReason,
+          stop_sequence: null,
+          usage: result.usage ?? emptyUsage(),
+        }
 
-      yield {
-        type: 'assistant',
-        message: apiAssistant,
-        parent_tool_use_id: null,
-        uuid: uuid(),
-        session_id: sessionId,
-      }
+        yield {
+          type: 'assistant',
+          message: apiAssistant,
+          parent_tool_use_id: null,
+          uuid: uuid(),
+          session_id: sessionId,
+        }
 
-      history.push({
-        role: 'assistant',
-        content: text,
-        tool_calls: calls.length ? calls : undefined,
-      })
+        history.push({
+          role: 'assistant',
+          content: text,
+          tool_calls: calls.length ? calls : undefined,
+        })
+      }
 
       // end_turn — unless the user queued more messages, in which case keep
       // going (the next iteration's boundary injects the next queued message).
@@ -1294,6 +1301,12 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
         paused = true
         break
       }
+
+      // Terminal tool (e.g. a `finish`/`done` tool marked endsTurn): the model
+      // has explicitly signalled completion, so end here instead of making one
+      // more LLM call that would just return an empty turn. The tool's result is
+      // already recorded above; `lastText` holds the closing assistant text.
+      if (calls.some((c) => byName.get(c.function.name)?.endsTurn)) break
     }
 
     await runHooks('Stop', {
