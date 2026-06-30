@@ -23,10 +23,26 @@ export interface McpSdkServerConfig {
   server: SdkMcpServer
 }
 
+/** Local MCP server spawned as a child process (Node/Bun only). */
+export interface McpStdioServerConfig {
+  type: 'stdio'
+  /** Executable to run, e.g. 'npx', 'uvx', 'node', or an absolute path. */
+  command: string
+  /** Arguments, e.g. ['-y', '@modelcontextprotocol/server-filesystem', '/work']. */
+  args?: string[]
+  /** Extra env vars merged over the parent process env. */
+  env?: Record<string, string>
+  /** Working directory for the child. */
+  cwd?: string
+  /** Per-request timeout in ms (handshake + each call). Default 60000. */
+  timeoutMs?: number
+}
+
 export type McpServerConfig =
   | McpHttpServerConfig
   | McpSSEServerConfig
   | McpSdkServerConfig
+  | McpStdioServerConfig
 
 /** Map of server name → configuration. The key is the server's name. */
 export type McpServers = Record<string, McpServerConfig>

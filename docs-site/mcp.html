@@ -34,7 +34,7 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span class="dot"></span> anyclaude-sdk</div>
-    <div class="brand-sub">v0.13.1 · MIT</div>
+    <div class="brand-sub">v0.14.0 · MIT</div>
     <nav class="nav">
       <a href="index.html">Overview</a>
       <a href="demo/" class="live" target="_blank" rel="noopener">Live demo &#8599;</a>
@@ -56,7 +56,7 @@
   <main>
     <section id="top">
       <h1>MCP — Model Context Protocol</h1>
-      <p class="tag">Wire external tools into the agent. anyclaude-sdk loads tools from <b>remote MCP servers</b> (HTTP/SSE) and <b>in-process SDK servers</b> (plain JS, no subprocess), wrapping each as a native tool. Pass them via <code>query({ mcpServers })</code>.</p>
+      <p class="tag">Wire external tools into the agent. anyclaude-sdk loads tools from <b>remote MCP servers</b> (HTTP/SSE), <b>local stdio servers</b> (spawned child process, Node/Bun), and <b>in-process SDK servers</b> (plain JS, no subprocess), wrapping each as a native tool. Pass them via <code>query({ mcpServers })</code>.</p>
     </section>
 
     <section id="external">
@@ -74,6 +74,25 @@ await query({
 })
 // Model sees tools like: mcp__docs__search, mcp__events__subscribe</code></pre></div>
       <p>Loading <b>never throws</b>: a server that fails to connect simply contributes no tools and a <code>failed</code> status. Per-server connection status is surfaced on the <code>system</code> <code>init</code> message (<code>mcp_servers</code>), so you can show it in your UI.</p>
+    </section>
+
+    <section id="stdio">
+      <h2><i data-lucide="terminal"></i> Local stdio servers <span class="badge">0.14</span></h2>
+      <p>The form most MCP servers ship as — and what Claude Code spawns locally. anyclaude-sdk runs the <code>command</code> as a child process and speaks newline-delimited JSON-RPC over its stdin/stdout. <b>Node/Bun only</b> (it spawns a process); in the browser the server reports a <code>failed</code> status with a clear message, so the rest of the run is unaffected. Pair it with <code>LocalSandbox</code> for a Claude-Code-like local agent.</p>
+      <div class="code"><pre><code class="language-ts">import { query, LocalSandbox, createAnthropicClient } from 'anyclaude-sdk'
+
+await query({
+  prompt: 'Summarize the git history and read the config files.',
+  workspace: new LocalSandbox({ cwd: '/path/to/project' }),
+  llm: createAnthropicClient({ apiKey, model: 'claude-sonnet-4-6' }),
+  mcpServers: {
+    fs:  { type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/path/to/project'] },
+    git: { type: 'stdio', command: 'uvx', args: ['mcp-server-git', '--repository', '/path/to/project'],
+           env: { GIT_AUTHOR_NAME: 'agent' }, cwd: '/path/to/project', timeoutMs: 60000 },
+  },
+})
+// Model sees: mcp__fs__read_file, mcp__git__git_log, …</code></pre></div>
+      <p>Config: <code>command</code> (required), <code>args?</code>, <code>env?</code> (merged over the parent env), <code>cwd?</code>, and <code>timeoutMs?</code> (per request, default 60s). The child is <code>unref()</code>-ed so it never blocks process exit, and is killed automatically when the run's <code>abortController</code> fires or via <code>StdioMcpClient.close()</code>.</p>
     </section>
 
     <section id="sdk">

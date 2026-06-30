@@ -5,6 +5,7 @@
 import type { ContentBlockParam, ToolDef } from '../types/index.js'
 import type { Tool, ToolResult } from '../tools/types.js'
 import { McpClient } from './client.js'
+import { StdioMcpClient } from './stdio.js'
 import type {
   McpContentBlock,
   McpServers,
@@ -16,6 +17,7 @@ import type {
 
 export * from './types.js'
 export { McpClient } from './client.js'
+export { StdioMcpClient } from './stdio.js'
 export { applyProxy, type McpProxy } from './proxy.js'
 export { tool, createSdkMcpServer } from './sdkServer.js'
 
@@ -105,7 +107,12 @@ function wrapSdkTool(serverName: string, t: SdkMcpTool): Tool {
   }
 }
 
-function wrapRemoteTool(serverName: string, client: McpClient, info: McpToolInfo): Tool {
+/** Anything that can invoke an MCP tool — McpClient (http/sse) or StdioMcpClient. */
+interface McpToolCaller {
+  callTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<McpToolResult>
+}
+
+function wrapRemoteTool(serverName: string, client: McpToolCaller, info: McpToolInfo): Tool {
   return {
     def: {
       type: 'function',
@@ -158,6 +165,24 @@ export async function loadMcpServers(
         status: 'connected',
         tools: config.server.tools.map((t) => t.name),
       })
+      continue
+    }
+
+    // Local stdio (spawned child process; Node/Bun only).
+    if (config.type === 'stdio') {
+      try {
+        const client = new StdioMcpClient(config, name)
+        await client.connect(signal)
+        const infos = await client.listTools(signal)
+        tools.push(...infos.map((info) => wrapRemoteTool(name, client, info)))
+        statuses.push({ name, status: 'connected', tools: infos.map((i) => i.name) })
+      } catch (err) {
+        statuses.push({
+          name,
+          status: 'failed',
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
       continue
     }
 

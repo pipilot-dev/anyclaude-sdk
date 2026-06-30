@@ -8,6 +8,9 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.14.0
+- **Local stdio MCP servers** — `query({ mcpServers: { fs: { type: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem', '/work'] } } })`. The SDK spawns the command as a child process and speaks newline-delimited JSON-RPC over stdin/stdout (the transport Claude Code and most MCP servers use), discovering tools and exposing them as `mcp__<server>__<tool>` just like HTTP/SSE/in-process servers. Config: `command`, `args?`, `env?` (merged over parent env), `cwd?`, `timeoutMs?` (default 60s). **Node/Bun only** — `node:child_process` is lazy-imported so the browser build stays clean, and in the browser a stdio server reports a `failed` status (clear message) without affecting the run. The child is `unref()`-ed (never blocks process exit) and killed on the run's `abortController` abort or `StdioMcpClient.close()`. New exports: `StdioMcpClient`, `McpStdioServerConfig`. Pairs naturally with `LocalSandbox` for a Claude-Code-like local agent.
+
 ### 0.13.1
 Retry-policy refinements (follow-ups to 0.13.0):
 - **Smarter 401 handling.** A `401` is now retried at most once by default (`authRetries: 1`) instead of consuming the full 10-attempt budget — transient cold-start/key-refresh 401s still clear, but a genuinely bad key fails fast (~1s) instead of stalling ~90s. Set `authRetries: 0` to never retry 401, or raise it.
