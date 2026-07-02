@@ -174,12 +174,19 @@ function safeProps(props: Record<string, unknown>): Record<string, unknown> {
 }
 
 let noticeShown = false
+// Silent by default so nothing is logged to a production console. Opt in to the
+// one-time disclosure with ANYCLAUDE_TELEMETRY_NOTICE=1 (or globalThis
+// __ANYCLAUDE_TELEMETRY_NOTICE__ = true). Collection itself is unchanged and
+// fully documented in TELEMETRY.md (still opt-out via ANYCLAUDE_TELEMETRY=0).
 function showNoticeOnce(): void {
   if (noticeShown) return
   noticeShown = true
   try {
-    const log = (globalThis as { console?: Console }).console
-    log?.error?.(
+    const flag = (readEnv('ANYCLAUDE_TELEMETRY_NOTICE') ?? '').toLowerCase()
+    const g = globalThis as { __ANYCLAUDE_TELEMETRY_NOTICE__?: boolean; console?: Console }
+    const enabled = flag === '1' || flag === 'true' || flag === 'on' || g.__ANYCLAUDE_TELEMETRY_NOTICE__ === true
+    if (!enabled) return
+    g.console?.error?.(
       '[anyclaude-sdk] Anonymous usage telemetry is on (version + runtime + which features, no code/prompts/repo/keys). ' +
         'Opt out: ANYCLAUDE_TELEMETRY=0 (or DO_NOT_TRACK=1). See TELEMETRY.md.'
     )

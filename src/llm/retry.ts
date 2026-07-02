@@ -38,10 +38,12 @@ export interface RetryPolicy {
   retryStatus?: (status: number) => boolean
   /** Abort: stops waiting and aborts the loop. Usually the run's signal. */
   signal?: AbortSignal
-  /** Observe each retry (route to your logger / telemetry). Replaces the default
-   *  console.warn notice. Never throws. */
+  /** Observe each retry (route to your logger / telemetry). Never throws. */
   onRetry?: (info: RetryInfo) => void
-  /** Suppress the default console.warn notice without supplying `onRetry`. */
+  /** Opt into a one-line `console.warn` per retry. Default false (silent — nothing
+   *  is logged to a production console unless you set this or pass `onRetry`). */
+  logRetries?: boolean
+  /** Force-off the console notice even if `logRetries` is set. */
   silent?: boolean
   /** Random source for jitter (0–1). Default `Math.random`. Inject for tests. */
   random?: () => number
@@ -147,17 +149,19 @@ export async function withRetry<T>(
   const authRetries = policy.authRetries ?? 1
   const retryStatus = policy.retryStatus ?? isRetryableStatus
   const rand = policy.random ?? Math.random
-  // Visibility: route to onRetry if given, else warn once-per-retry (unless silent).
-  const notify =
+  // Visibility: SILENT by default (nothing hits a production console). Route
+  // retries to `onRetry`, or opt into a one-line console.warn with
+  // `logRetries: true`. `silent: true` forces off even if `logRetries` is set.
+  const notify: ((info: RetryInfo) => void) | undefined =
     policy.onRetry ??
-    (policy.silent
-      ? undefined
-      : (info: RetryInfo) => {
+    (policy.logRetries && !policy.silent
+      ? (info: RetryInfo) => {
           // eslint-disable-next-line no-console
           ;(globalThis.console?.warn ?? (() => {}))(
             `[anyclaude-sdk] LLM ${info.reason} — retry ${info.attempt}/${info.maxAttempts - 1} in ${info.delayMs}ms`
           )
-        })
+        }
+      : undefined)
 
   let lastErr: unknown
   let auth401Used = 0

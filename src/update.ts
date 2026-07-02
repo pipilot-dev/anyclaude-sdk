@@ -126,9 +126,13 @@ export function checkForUpdate(opts: UpdateCheckOptions = {}): Promise<UpdateInf
 let notified = false
 
 /**
- * Fire-and-forget: if a newer version is published, print ONE friendly, opt-out
- * console hint (once per process). Never blocks or throws. Safe to call on every
- * run — it self-throttles. Pass a custom logger to route it into your own UI.
+ * Fire-and-forget update hint. SILENT by default — it never writes to the console
+ * on its own (nothing is logged in production unless you ask for it). To surface a
+ * "newer version available" notice, pass your own `log` (route it into your UI), or
+ * opt into a one-line console hint with `ANYCLAUDE_UPDATE_NOTICE=1` (or
+ * globalThis `__ANYCLAUDE_UPDATE_NOTICE__ = true`). Never blocks or throws;
+ * self-throttles to once per process. Hosts that want the signal without any
+ * console output should use `checkForUpdate()` directly.
  */
 export function notifyIfOutdated(
   opts: UpdateCheckOptions & { log?: (msg: string) => void } = {}
@@ -136,19 +140,23 @@ export function notifyIfOutdated(
   if (notified || !updateCheckEnabled(opts)) return
   notified = true
   const pkg = opts.pkg ?? DEFAULT_PKG
+  // Resolve a sink: explicit log > opt-in console hint > no-op (default, silent).
+  let sink: ((m: string) => void) | undefined = opts.log
+  if (!sink) {
+    const flag = (readEnv('ANYCLAUDE_UPDATE_NOTICE') ?? '').toLowerCase()
+    const g = globalThis as { __ANYCLAUDE_UPDATE_NOTICE__?: boolean; console?: Console }
+    if (flag === '1' || flag === 'true' || flag === 'on' || g.__ANYCLAUDE_UPDATE_NOTICE__ === true) {
+      sink = (m: string) => g.console?.warn?.(m)
+    }
+  }
+  if (!sink) return // silent by default
+  const log = sink
   void checkForUpdate(opts)
     .then((info) => {
       if (!info.outdated || !info.latest) return
-      const log =
-        opts.log ??
-        ((m: string) => {
-          // eslint-disable-next-line no-console
-          ;(globalThis.console?.warn ?? (() => {}))(m)
-        })
       log(
         `[${pkg}] Update available: ${info.current} → ${info.latest}. ` +
-          `Upgrade: npm i ${pkg}@latest · changelog: https://github.com/pipilot-dev/anyclaude-sdk/blob/main/CHANGELOG.md · ` +
-          `silence: ANYCLAUDE_UPDATE_CHECK=0`
+          `Upgrade: npm i ${pkg}@latest · changelog: https://github.com/pipilot-dev/anyclaude-sdk/blob/main/CHANGELOG.md`
       )
     })
     .catch(() => {

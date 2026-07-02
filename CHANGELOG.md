@@ -8,6 +8,13 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.14.5
+- **No console output by default (production-quiet).** The SDK no longer writes anything to the console unless you ask it to:
+  - **Telemetry notice** — the one-time "telemetry is on" line is now opt-in (`ANYCLAUDE_TELEMETRY_NOTICE=1` or `globalThis.__ANYCLAUDE_TELEMETRY_NOTICE__=true`). **Collection is unchanged** — still anonymous, still opt-out via `ANYCLAUDE_TELEMETRY=0`, still documented in TELEMETRY.md.
+  - **Update check** — silent by default and it no longer even pings the npm registry on its own. Opt into the one-line hint with `ANYCLAUDE_UPDATE_NOTICE=1` / `__ANYCLAUDE_UPDATE_NOTICE__=true`, pass your own `log`, or call `checkForUpdate()` for the signal with zero console output.
+  - **Retry warnings** — silent by default; opt in with `retry: { logRetries: true }` or route them via `retry: { onRetry }`.
+- **Single version source.** `src/version.ts` is now auto-generated from `package.json` on `prebuild` (`scripts/sync-version.mjs`), so `SDK_VERSION` can never drift from the published version again (the cause of the 0.14.2/0.14.3 mismatch). Bump only `package.json`.
+
 ### 0.14.4
 - chore(release): correct the internal `SDK_VERSION` string. 0.14.2/0.14.3 were built with `version.ts` lagging the published `package.json`, so those packages reported an older `SDK_VERSION` in telemetry / `checkForUpdate()`. No API or behavior change — `keepImages` (0.14.2) and `alwaysOnTools` (0.14.3) are unchanged; this just realigns the version string.
 
