@@ -12,11 +12,11 @@ const WC_PROMPT = `Environment: a browser WebContainer. The bash tool runs a rea
 
 const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env ?? {}
 const llm = createOpenAIClient({
-  baseUrl: env.VITE_LLM_BASE ?? 'https://api.kilo.ai/api/gateway',
-  model: env.VITE_LLM_MODEL ?? 'kilo-auto/free',
+  baseUrl: env.VITE_LLM_BASE ?? 'https://the3rdacademy.com/api/v1',
+  model: env.VITE_LLM_MODEL ?? 'claude-sonnet-4-6',
   apiKey: env.VITE_LLM_KEY,
 })
-const MODEL = env.VITE_LLM_MODEL ?? 'kilo-auto/free'
+const MODEL = env.VITE_LLM_MODEL ?? 'claude-sonnet-4-6'
 
 let bootPromise: Promise<WebContainer> | null = null
 const bootWC = () => (bootPromise ??= WebContainer.boot())
