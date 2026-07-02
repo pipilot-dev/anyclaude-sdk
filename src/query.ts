@@ -53,9 +53,18 @@ export interface QueryOptions {
   /** Tool names to defer out of the per-turn payload — discoverable via `tool_search`
    *  and armed on demand. Saves tokens on large tool pools (also per-tool `defer: true`). */
   deferredTools?: string[]
+  /** ALLOWLIST cap (takes precedence over `deferredTools`): send ONLY these tools (+ `tool_search`)
+   *  and defer every other tool, including SDK-injected team/background/plan/MCP tools. Hard-caps
+   *  the per-turn tool payload to a small core regardless of which features add tools. */
+  alwaysOnTools?: string[]
   /** Context editing: keep only the most recent N tool_result messages verbatim; older
    *  ones are stubbed before each LLM call. Caps transcript growth on long runs. */
   keepToolResults?: number
+  /** Context editing (vision): keep only the most recent N tool-forwarded IMAGE turns verbatim;
+   *  image blocks in older forwarded-media turns are stubbed before each LLM call. Lets a read
+   *  image drop out of context after it's been processed (re-readable from the file). Off when
+   *  undefined; the user's own attached images are never touched. */
+  keepImages?: number
   /** Run a turn's read-only tool calls concurrently (mutating/bash/delegated stay serial). */
   parallelToolExecution?: boolean
   maxTurns?: number
@@ -178,6 +187,8 @@ export function query(options: QueryOptions): Query {
     disallowedTools: options.disallowedTools,
     deferredTools: options.deferredTools,
     keepToolResults: options.keepToolResults,
+    keepImages: options.keepImages,
+    alwaysOnTools: options.alwaysOnTools,
     parallelToolExecution: options.parallelToolExecution,
     maxTurns: options.maxTurns,
     maxDurationMs: options.maxDurationMs,

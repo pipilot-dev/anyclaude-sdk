@@ -113,11 +113,24 @@ export interface AgentOptions {
    *  until the model searches and the loop arms them. For large pools of
    *  rarely-used integration tools. (Per-tool `defer: true` works too.) */
   deferredTools?: string[]
+  /** ALLOWLIST cap (takes precedence over `deferredTools`): send ONLY these tool schemas
+   *  (plus `tool_search`) in the per-turn payload and DEFER every other tool — including the
+   *  team/background/plan/MCP tools the SDK injects internally, which a `deferredTools` denylist
+   *  can't enumerate. Deferred tools stay discoverable + executable via `tool_search`. Use to
+   *  hard-cap the sent surface to a small core (e.g. ~20) regardless of what features add tools. */
+  alwaysOnTools?: string[]
   /** Context editing: keep only the most recent N tool_result messages verbatim;
    *  older ones are replaced with a short stub before each LLM call. Caps transcript
    *  growth on long runs. Off when undefined. (Trades prompt-cache hits on the cleared
    *  span for fewer tokens — a clear win on uncached endpoints.) */
   keepToolResults?: number
+  /** Context editing (vision): keep only the most recent N tool-forwarded IMAGE turns
+   *  verbatim; image blocks in OLDER forwarded-media turns are replaced with a short text
+   *  stub before each LLM call. A read image was already processed when first read, so it
+   *  needn't ride along in full every subsequent turn (huge saving on long multimodal runs);
+   *  the agent can re-read the file to see it again. Only the tool-forwarded media turns are
+   *  touched — the user's own attached images are left intact. Off when undefined. */
+  keepImages?: number
   /** Execute a turn's tool calls concurrently when they're all read-only + server-run
    *  (mutating tools / bash / delegated stay sequential). Latency win on multi-read turns. */
   parallelToolExecution?: boolean
@@ -477,10 +490,18 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
   // discoverable via tool_search and executable. `tool_search` surfaces them and
   // arms them (adds their schema to subsequent turns). tool_search itself is
   // never deferred, or discovery breaks.
+  // `alwaysOnTools` (allowlist) takes precedence: defer EVERY tool whose name isn't in it —
+  // this catches the team/background/plan/MCP tools merged into `tools` above that a caller-side
+  // denylist can't see. Otherwise fall back to the `deferredTools` denylist + per-tool defer:true.
+  // `tool_search` is never deferred in either mode, or discovery/arming breaks.
+  const alwaysOnSet = options.alwaysOnTools?.length
+    ? new Set<string>([...options.alwaysOnTools, 'tool_search'])
+    : null
   const deferredSet = new Set<string>(
-    [...(options.deferredTools ?? []), ...tools.filter((t) => t.defer).map((t) => t.def.function.name)].filter(
-      (n) => n !== 'tool_search'
-    )
+    (alwaysOnSet
+      ? tools.map((t) => t.def.function.name).filter((n) => !alwaysOnSet.has(n))
+      : [...(options.deferredTools ?? []), ...tools.filter((t) => t.defer).map((t) => t.def.function.name)]
+    ).filter((n) => n !== 'tool_search')
   )
   const armed = new Set<string>()
   const sentDefs = (): ToolDef[] =>
@@ -520,6 +541,35 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
       const m = history[toolIdx[j]]
       if (typeof m.content === 'string' && m.content !== CLEARED_STUB) m.content = CLEARED_STUB
       else if (Array.isArray(m.content)) m.content = CLEARED_STUB
+    }
+  }
+
+  // Context editing (images): keep the most recent N tool-forwarded image turns verbatim;
+  // replace image blocks in OLDER forwarded-media turns with a short text stub. Media read by
+  // tools is forwarded as a `user` turn tagged MEDIA_MARKER (see below), so we scope strictly
+  // to those turns — the user's own attachment turns are never touched. Idempotent: once a
+  // turn's images are stubbed it no longer counts as an image turn, so the recent-N window is
+  // stable as new media arrives.
+  const keepImages = options.keepImages
+  const IMAGE_STUB = '[earlier image cleared to save context — re-read the file to view it again]'
+  // Tag on the `user` turn that forwards tool-read media (image/PDF bytes) to the model. Used
+  // both when pushing that turn (below) and to scope image-pruning to exactly those turns.
+  const MEDIA_MARKER = 'Attached file content from the tools above:'
+  const pruneOldImages = (): void => {
+    if (keepImages == null || keepImages < 0) return
+    const mediaIdx: number[] = []
+    for (let i = 0; i < history.length; i++) {
+      const m = history[i]
+      if (m.role !== 'user' || !Array.isArray(m.content)) continue
+      const hasImage = m.content.some((b) => b.type === 'image')
+      const isToolMedia = m.content.some((b) => b.type === 'text' && b.text === MEDIA_MARKER)
+      if (hasImage && isToolMedia) mediaIdx.push(i)
+    }
+    const cutoff = mediaIdx.length - keepImages
+    for (let j = 0; j < cutoff; j++) {
+      const m = history[mediaIdx[j]]
+      if (!Array.isArray(m.content)) continue
+      m.content = m.content.map((b) => (b.type === 'image' ? { type: 'text', text: IMAGE_STUB } as const : b))
     }
   }
 
@@ -906,6 +956,9 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
       // Context editing: stub out all but the most recent N tool_result messages so
       // old tool output stops costing tokens on every subsequent turn.
       pruneToolResults()
+      // …and stub image blocks in all but the most recent N tool-forwarded media turns, so a
+      // read image stops costing vision tokens every turn (re-readable from the file on demand).
+      pruneOldImages()
 
       let streamedText = ''
       let captured: ToolCall[] = []
@@ -1277,7 +1330,7 @@ export async function* runAgent(options: AgentOptions): AsyncGenerator<SDKMessag
         history.push({
           role: 'user',
           content: [
-            { type: 'text', text: 'Attached file content from the tools above:' },
+            { type: 'text', text: MEDIA_MARKER },
             ...turnMedia,
           ],
         })

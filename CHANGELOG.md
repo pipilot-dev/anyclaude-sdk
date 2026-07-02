@@ -8,6 +8,15 @@ This repo publishes two packages: **anyclaude-sdk** and **anyclaude-react**.
 
 ## anyclaude-sdk
 
+### 0.14.4
+- chore(release): correct the internal `SDK_VERSION` string. 0.14.2/0.14.3 were built with `version.ts` lagging the published `package.json`, so those packages reported an older `SDK_VERSION` in telemetry / `checkForUpdate()`. No API or behavior change — `keepImages` (0.14.2) and `alwaysOnTools` (0.14.3) are unchanged; this just realigns the version string.
+
+### 0.14.3
+- **New `alwaysOnTools?: string[]` (allowlist tool cap).** Send ONLY the named tools (plus `tool_search`) in the per-turn payload and DEFER every other tool — crucially including the team/background/plan/MCP tools the SDK injects internally, which a `deferredTools` **denylist** can't enumerate. Deferred tools stay discoverable + executable via `tool_search`. Takes precedence over `deferredTools`. Use to hard-cap the sent tool surface to a small core (e.g. ~20) regardless of which features add tools.
+
+### 0.14.2
+- **New `keepImages?: number` (context editing for vision).** Keeps only the most recent N tool-forwarded image turns verbatim; image blocks in older forwarded-media turns are replaced with a short text stub before each LLM call. A read image is already processed when first read, so it no longer rides along in full on every subsequent turn — a large saving on long multimodal runs (the agent can re-read the file to see it again). Only the tool-forwarded media turns are touched; the user's own attached images are left intact. Mirrors `keepToolResults`; off when undefined.
+
 ### 0.14.1
 Two fixes for the end-of-run experience (seen in the wild — a run ending in a blank "(empty response)" after a `finish` tool):
 - **No more blank trailing turn.** When a model returns a wholly-empty turn (no text, no tool calls — e.g. only a reasoning/thinking block, which happens right after a terminal tool when it has nothing left to say), the SDK no longer emits an assistant message with an empty `content` array. That empty array was rendering as a blank "(empty response)" bubble. The run's `result` still carries the last meaningful text.
